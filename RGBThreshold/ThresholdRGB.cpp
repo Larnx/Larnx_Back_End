@@ -24,9 +24,6 @@ int main()
 	VideoCapture cap("Clip 64 AS.mp4");
 	namedWindow("Video Capture", WINDOW_NORMAL);
 	namedWindow("Object Detection", WINDOW_NORMAL);
-	// pull request comment
-	// pull request comment 2
-	// pull request comment 3
 	//-- Trackbars to set thresholds for RGB values
 	/* createTrackbar("Low R", "Object Detection", &low_r, 255, on_low_r_thresh_trackbar);
 	createTrackbar("High R", "Object Detection", &high_r, 255, on_high_r_thresh_trackbar);
