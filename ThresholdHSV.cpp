@@ -53,11 +53,11 @@ int main(int argc, char *argv[]) {
 	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));
 	int fps = 30; // 30 frames per second
 
-	
+
 	namedWindow("Video Capture", WINDOW_NORMAL);
 	namedWindow("Object Detection", WINDOW_NORMAL);
-	
-	
+
+
 
 	/*cv::Scalar minBGR = cv::Scalar(bgrPixel.val[0] - thresh, bgrPixel.val[1] - thresh, bgrPixel.val[2] - thresh);
 	cv::Scalar maxBGR = cv::Scalar(bgrPixel.val[0] + thresh, bgrPixel.val[1] + thresh, bgrPixel.val[2] + thresh);
@@ -109,17 +109,19 @@ int main(int argc, char *argv[]) {
 		bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
 
 		// get time stamps and sum pixels
-		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC)/1000 << "," << cv::sum(resultHSV)[0] << endl;
-		
+		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
+		// print to console
+		cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << cv::sum(resultHSV)[0] << endl;
+
 		writer.write(resultHSV);
 
 		imshow("Video Capture", bright);
 		imshow("Object Detection", resultHSV);
-		
+
 	}
 	// close the output file
 	outputFile.close();
 
-	
+
 	return 0;
 }
