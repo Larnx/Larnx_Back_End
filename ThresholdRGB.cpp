@@ -37,9 +37,11 @@ int main()
 			break;
 		//-- Detect the object based on RGB Range Values
 		inRange(frame, Scalar(low_b, low_g, low_r), Scalar(high_b, high_g, high_r), frame_threshold);
+		Mat resultFrame = Mat::zeros(frame.rows, frame.cols, CV_8UC3);
+		bitwise_and(frame, frame, resultFrame, frame_threshold); // bitwise to get color from mask
 		//-- Show the frames
 		imshow("Video Capture", frame);
-		imshow("Object Detection", frame_threshold);
+		imshow("Object Detection", resultFrame); // frame_threshold
 	}
 	return 0;
 }
