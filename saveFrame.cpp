@@ -32,20 +32,25 @@ int main(int argc, char* argv[])
 	double currentTime;
 	while ((char)waitKey(1) != 'q')
 	{
-		frameCount++; 
-		currentTime = timeStep*frameCount;
-		double currentTime_ms = 1000 * currentTime;
+		double ms = 1000*cap.get(CAP_PROP_POS_MSEC); // now in seconds
+		double T = cap.get(CAP_PROP_FPS);
+		double F = cap.get(CAP_PROP_FRAME_COUNT);
+		
+		// frameCount++; 
+		// currentTime = timeStep*frameCount;
+		// double currentTime_ms = 1000 * currentTime;
 
 		cap >> frame;
 		if (frame.empty()) break;
 
+		// From Napassorn: Use CAP_PROP_... instead (cut out the CV infron) and should work
 		/* Crap Ass OpenCV library has bugs: (always returns 0) 
 			double ms = cap.get(CV_CAP_PROP_POS_MSEC);
 			double T = cap.get(CV_CAP_PROP_FPS);
 			double F = cap.get(CV_CAP_PROP_FRAME_COUNT);
 		*/
 
-		if (round(currentTime_ms) == Selected_Frame_TimeStamp) {		// Save the frame if its timestamp matches the desired timestamp. 
+		if (round(ms) == Selected_Frame_TimeStamp) {		// Save the frame if its timestamp matches the desired timestamp. 
 			//imshow("Video Capture", frame);							// Show us the frame to be sure ;) 
 			imwrite(Output_Path, frame);								// And save it 
 			break;														// No need to keep going. We can modify this to save a arbitrary number of frames
