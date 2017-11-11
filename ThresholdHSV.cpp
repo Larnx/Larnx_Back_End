@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
 		// get time stamps and sum pixels
 		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
 		// print to console
-		cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << cv::sum(resultHSV)[0] << endl;
+		cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
 
 		writer.write(resultHSV);
 
