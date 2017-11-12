@@ -15,14 +15,20 @@ The following describes current methods of operating with the Larnx back-end:
 
 The Larnx executable can me run from the command line: 
 
-Method 1: Execute Video Processing Pipeline\n
-Path/To/Larnx/Executable/Larnx_Back_End.exe 1 Path/To/Source/Video/ProcessMe.mp4 Output/Path/outputVideo.mp4\n
+Method 1: Execute Video Processing Pipeline
+
+Path/To/Larnx/Executable/Larnx_Back_End.exe 1 Path/To/Source/Video/ProcessMe.mp4 Output/Path/outputVideo.mp4
+
 Please use apropriate "1" in first argument to specify command as Method 1.
 
 Method 2: Save Frame 
-Path/To/Larnx/Executable/Larnx_Back_End.exe 2 Path/To/Source/Video/ProcessMe.mp4 Output/Path/outputVideo.mp3 2000\n
-Please use apropriate "2" in first argument to specify command as Method 2.\n
+
+Path/To/Larnx/Executable/Larnx_Back_End.exe 2 Path/To/Source/Video/ProcessMe.mp4 Output/Path/outputVideo.mp3 2000
+
+Please use apropriate "2" in first argument to specify command as Method 2.
+
 The fourth argument is the video time in milliseconds at which to save the frame.
 
-Method 3: Trim Video\n
+Method 3: Trim Video
+
 In progress.. README will be updated to expand on new methods 
