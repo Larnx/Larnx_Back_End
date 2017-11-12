@@ -8,33 +8,52 @@
 #include <fstream>
 #include <cstring>
 #include <stdlib.h>
+#include <map>
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
 using namespace std;
 using namespace cv;
 
-void saveFrame(Mat frame, VideoCapture cap, double Selected_Frame_TimeStamp, string Output_Path) {
+double const	fps = 30;
+double const	timeStep = 1 / fps;
 
+
+void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_Frame_TimeStamp)
+{
+	Mat frame;
+	VideoCapture cap(Video_Path);
+
+	namedWindow("Video Capture", WINDOW_NORMAL);
+
+	int frameCount = 0;
+	double currentTime;
 	while ((char)waitKey(1) != 'q')
 	{
-		double ms = 1000 * cap.get(CAP_PROP_POS_MSEC); // now in seconds
-		double T = cap.get(CAP_PROP_FPS);
-		double F = cap.get(CAP_PROP_FRAME_COUNT);
+		frameCount++; 
+		currentTime = timeStep*frameCount;
+		double currenttime_ms = 1000 * currentTime;
 
 		cap >> frame;
 		if (frame.empty()) break;
 
-
-		if (round(ms) == Selected_Frame_TimeStamp) {		// Save the frame if its timestamp matches the desired timestamp. 
-															//imshow("Video Capture", frame);							// Show us the frame to be sure ;) 
-			imwrite(Output_Path, frame);								// And save it 
-			break;														// No need to keep going. We can modify this to save a arbitrary number of frames
+		if (round(currenttime_ms) == Selected_Frame_TimeStamp) {		// save the frame if its timestamp matches the desired timestamp. 
+			imshow("video capture", frame);							    // show us the frame to be sure ;) 
+			imwrite(Output_Directory_Path + "n.jpg", frame);		// and save it 
+			break;														// no need to keep going. we can modify this to save a arbitrary number of frames
 		}
-
 	}
 }
 
-void ThresholdHSV(VideoCapture cap, Mat bright, Mat brightHSV) {
+void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
+
+	// get video
+	Mat bright, brightHSV;
+	// VideoCapture cap(Video_Path);
+	VideoCapture cap(Video_Path);
+	/*End Video Parameters*/
+
+	namedWindow("Video Capture", WINDOW_NORMAL);
+	namedWindow("Object Detection", WINDOW_NORMAL);
+
 	/* Current Function: Segments green from video, returns pixel data vs time stamps for UI to plot to console, saves segmented vdo */
 	/* Future Functions: Track green residue with bound boxes, returns ratio pixel data vs time stamp*/
 	//create an ofstream for the file output 
@@ -42,12 +61,12 @@ void ThresholdHSV(VideoCapture cap, Mat bright, Mat brightHSV) {
 	// create a name for the file output
 	string filename = "GreenPixels.csv";
 	// create the .csv file
-	outputFile.open(filename);
+	outputFile.open(Output_Directory_Path + filename);
 	// write the file headers for csv
 	outputFile << "Frame Count" << "," << "Time (sec)" << "," << "Pixel Intensity" << endl;
 
 	// Write new video
-	string filenameVDO = "New Clip 64 AS.avi";
+	string filenameVDO = "New.avi";
 
 	// get frame size
 	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));  // frame width = 1280, height = 720
@@ -55,7 +74,7 @@ void ThresholdHSV(VideoCapture cap, Mat bright, Mat brightHSV) {
 
 	// create output window
 	VideoWriter writer;
-	writer.open(filenameVDO, 0, fps, frameSize, 1);
+	writer.open(Output_Directory_Path + filenameVDO, 0, fps, frameSize, 1);
 
 	while ((char)waitKey(1) != 'q') {
 		cap >> bright; // frame width = 1280, height = 720
@@ -88,40 +107,77 @@ void ThresholdHSV(VideoCapture cap, Mat bright, Mat brightHSV) {
 	}
 	// close the output file
 	outputFile.close();
-
 }
+
 
 int main(int argc, char *argv[]) {
 
-	/* Video Parameters*/
-	string Video_Path;					// Electron tells us where the video is located...
-	string Output_Path;					// ... And Electron tells us where to write the output
-	double Selected_Frame_TimeStamp;	// Electron specifies which frame it wants as a timestamp in milliseconds
+	// First argument determines behavior
+	int method = atoi(argv[1]);
 
-	if (argc != 4) {
-		printf("Invalid usage: %s filename", argv[0]);
+	// Initialize Variables - Not all will be used 
+	string Video_Path;
+	string Output_Directory_Path;
+	double Selected_Frame_TimeStamp;
+	double Trim_Start, Trim_End;
+
+	// Keep a dictionary of methods, for error throwing and reference. 
+	std::map<int, string> first;
+	first[1] = "Process Video";
+	first[2] = "Save Frame";
+	first[3] = "Trim Video";
+
+
+	switch (method) 
+	{
+		case 1 :	// 1: Process Video
+		{
+			if (argc != 4) {
+				printf("Invalid usage: Method %s in process %s", first[1], argv[0]);
+			}
+			else {
+				Video_Path = argv[2];
+				Output_Directory_Path = argv[3];
+			}
+
+			ThresholdHSV(Video_Path,Output_Directory_Path);
+
+			break;
+		}
+		case 2 :	// 2: Save Selected Frame
+		{
+			if (argc != 5) {
+				printf("Invalid usage: Method %s in process %s", first[2], argv[0]);
+			}
+			else {
+				Video_Path = argv[2];
+				Output_Directory_Path = argv[3];
+				Selected_Frame_TimeStamp = atof(argv[4]);
+			}
+
+			saveFrame(Video_Path,Output_Directory_Path,Selected_Frame_TimeStamp);
+
+			break;
+		}
+		case 3 :	// 3: Trim Video
+		{
+			if (argc != 5) {
+				printf("Invalid usage: Method %s in process %s", first[3], argv[0]);
+			}
+			else {
+				Video_Path = argv[2];
+				Output_Directory_Path = argv[3];
+				Trim_Start = atof(argv[4]);
+				Trim_End = atof(argv[5]);
+			}
+
+			// Add function call here 
+
+			break;
+		}
+		default: 
+			break;
 	}
-	else {
-		Video_Path = argv[1];
-		Output_Path = argv[2];
-		Selected_Frame_TimeStamp = atof(argv[3]);
-	}
-
-	// get video
-	Mat bright, brightHSV;
-	// VideoCapture cap(Video_Path);
-	VideoCapture cap("Clip 64 AS.mp4");
-	/*End Video Parameters*/
-
-	namedWindow("Video Capture", WINDOW_NORMAL);
-	namedWindow("Object Detection", WINDOW_NORMAL);
-	
-
-	// UI calls save frame
-	saveFrame(bright, cap, Selected_Frame_TimeStamp, Output_Path);
-
-	// UI calls ThresholdHSV
-	ThresholdHSV(cap, bright, brightHSV);
 
 	return 0;
 }
