@@ -37,7 +37,7 @@ void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_
 
 		if (round(currenttime_ms) == Selected_Frame_TimeStamp) {		// save the frame if its timestamp matches the desired timestamp. 
 			imshow("video capture", frame);							    // show us the frame to be sure ;) 
-			imwrite(Output_Directory_Path + "n.jpg", frame);		// and save it 
+			imwrite(Output_Directory_Path + "n.jpg", frame);			// and save it 
 			break;														// no need to keep going. we can modify this to save a arbitrary number of frames
 		}
 	}
@@ -97,7 +97,9 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
 		// get time stamps and sum pixels
 		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
 		// print to console
-		cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << " , " << cv::sum(resultHSV)[0] << endl;
+		cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << endl << cv::sum(resultHSV)[0] << endl;
+
+		//cout << cv::sum(resultHSV)[0] << endl;
 
 		writer.write(resultHSV);
 
