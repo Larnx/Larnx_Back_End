@@ -97,9 +97,15 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
 		// get time stamps and sum pixels
 		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
 		// print to console
-		cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << endl << cv::sum(resultHSV)[0] << endl;
+		//cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << endl << cv::sum(resultHSV)[0] << endl;
 
-		//cout << cv::sum(resultHSV)[0] << endl;
+
+		//cout << "\{ \"x:\"\"" << cap.get(CAP_PROP_POS_MSEC) / 1000 << "\",\"y:\"" << cv::sum(resultHSV)[0] << "\"\}" << endl;
+		// JSON Format
+		//'{ "name":"John", "age":30, "city":"New York"}'
+
+
+		cout << cv::sum(resultHSV)[0] << endl;
 
 		writer.write(resultHSV);
 
