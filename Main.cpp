@@ -21,6 +21,7 @@ void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_
 {
 	Mat frame;
 	VideoCapture cap(Video_Path);
+	string FRAME_NAME = "\\TEST.jpg";
 
 	namedWindow("Video Capture", WINDOW_NORMAL);
 
@@ -37,7 +38,7 @@ void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_
 
 		if (round(currenttime_ms) == Selected_Frame_TimeStamp) {		// save the frame if its timestamp matches the desired timestamp. 
 			imshow("video capture", frame);							    // show us the frame to be sure ;) 
-			imwrite(Output_Directory_Path + "n.jpg", frame);			// and save it 
+			imwrite(Output_Directory_Path + FRAME_NAME, frame);			// and save it 
 			break;														// no need to keep going. we can modify this to save a arbitrary number of frames
 		}
 	}
@@ -51,38 +52,32 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
 	VideoCapture cap(Video_Path);
 	/*End Video Parameters*/
 
+	string CSV_NAME = "\\TEST.csv";
+	string MP4_NAME = "\\TEST.avi";
+
 	namedWindow("Video Capture", WINDOW_NORMAL);
 	namedWindow("Object Detection", WINDOW_NORMAL);
 
 	/* Current Function: Segments green from video, returns pixel data vs time stamps for UI to plot to console, saves segmented vdo */
 	/* Future Functions: Track green residue with bound boxes, returns ratio pixel data vs time stamp*/
 	//create an ofstream for the file output 
+
 	ofstream outputFile;
-	// create a name for the file output
-	string filename = "GreenPixels.csv";
-	// create the .csv file
-	outputFile.open(Output_Directory_Path + filename);
-	// write the file headers for csv
-	outputFile << "Frame Count" << "," << "Time (sec)" << "," << "Pixel Intensity" << endl;
+	outputFile.open(Output_Directory_Path + CSV_NAME);
+	outputFile << "Frame Count" << "," << "Time (sec)" << "," << "Pixel Intensity" << endl; 	// write the file headers for csv
+																							
+	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));		// frame width = 1280, height = 720
+	int fps = cap.get(CAP_PROP_FPS);															// 30 frames per second
 
-	// Write new video
-	string filenameVDO = "New.avi";
-
-	// get frame size
-	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));  // frame width = 1280, height = 720
-	int fps = cap.get(CAP_PROP_FPS); // 30 frames per second
-
-	// create output window
 	VideoWriter writer;
-	writer.open(Output_Directory_Path + filenameVDO, 0, fps, frameSize, 1);
+	writer.open(Output_Directory_Path + MP4_NAME, 0, fps, frameSize, 1);
 
 	while ((char)waitKey(1) != 'q') {
-		cap >> bright; // frame width = 1280, height = 720
+		cap >> bright; 
 		if (bright.empty())
 			break;
 
-		// convert to HSV color space
-		cvtColor(bright, brightHSV, COLOR_BGR2HSV);
+		cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
 
 		//-- Detect the object based on HSV Range Values
 		//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
@@ -98,12 +93,9 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
 		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
 		// print to console
 		//cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << endl << cv::sum(resultHSV)[0] << endl;
-
-
-		//cout << "\{ \"x:\"\"" << cap.get(CAP_PROP_POS_MSEC) / 1000 << "\",\"y:\"" << cv::sum(resultHSV)[0] << "\"\}" << endl;
+		cout << "\{ \"x:\"\"" << cap.get(CAP_PROP_POS_MSEC) / 1000 << "\",\"y:\"" << cv::sum(resultHSV)[0] << "\"\}" << endl;
 		// JSON Format
 		//'{ "name":"John", "age":30, "city":"New York"}'
-
 
 		cout << cv::sum(resultHSV)[0] << endl;
 
@@ -186,6 +178,5 @@ int main(int argc, char *argv[]) {
 		default: 
 			break;
 	}
-
 	return 0;
 }
