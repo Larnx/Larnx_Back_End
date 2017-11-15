@@ -117,12 +117,14 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 	outputFile.close();
 }
 
-void contourTrack(string Video_Path, string Output_Directory_Path) {
+void contourTrack(string Video_Path, string Output_Directory_Path, string File_Name) {
 	// get video
 	Mat bright, brightHSV;
 	// VideoCapture cap(Video_Path);
 	VideoCapture cap(Video_Path);
 	/*End Video Parameters*/
+
+	File_Name = File_Name + ".avi";
 
 	namedWindow("Video Capture", WINDOW_NORMAL);
 	namedWindow("Object Tracking", WINDOW_NORMAL);
@@ -130,7 +132,7 @@ void contourTrack(string Video_Path, string Output_Directory_Path) {
 	/* Current Functions: Track green residue with bound contours and boxes*/
 
 	// Write new video
-	string filenameVDO = "NewTrack.avi"; // saves original video with bounding boxes
+	string filenameVDO = File_Name;
 
 	// get frame size
 	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));  // frame width = 1280, height = 720
@@ -191,10 +193,7 @@ void contourTrack(string Video_Path, string Output_Directory_Path) {
 
 		imshow("Video Capture", bright);
 		imshow("Object Tracking", brightClone);
-
 	}
-
-
 }
 
 int main(int argc, char *argv[]) {
@@ -270,19 +269,20 @@ int main(int argc, char *argv[]) {
 		}
 		case 4:    // 4. Track Object
 		{
-			if (argc != 4) {
+			if (argc != 5) {
 				printf("Invalid usage: Method %s in process %s", first[4], argv[0]);
 			}
 			else {
 				Video_Path = argv[2];
 				Output_Directory_Path = argv[3];
+				File_Name = argv[4];
+				File_Name = "\\" + File_Name;
 			}
 
-			contourTrack(Video_Path, Output_Directory_Path);
+			contourTrack(Video_Path, Output_Directory_Path, File_Name);
 
 			break;
 		}
-
 		default: 
 			break;
 	}
