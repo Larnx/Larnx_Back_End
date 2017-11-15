@@ -1,9 +1,15 @@
-// Main.cpp
+/* 
+	ECE Senior Design
+	Project Larnx 
+
+	Napassorn Lerdsudwichai 
+	Christina Howard
+	Kestutis Subacius
+*/
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
 #include<opencv2/imgproc/imgproc.hpp>
-
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -17,11 +23,11 @@ double const	fps = 30;
 double const	timeStep = 1 / fps;
 
 
-void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_Frame_TimeStamp)
+void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_Frame_TimeStamp, string File_Name)
 {
 	Mat frame;
 	VideoCapture cap(Video_Path);
-	string FRAME_NAME = "\\TEST.jpg";
+	string FRAME_NAME = File_Name + ".jpg";
 
 	namedWindow("Video Capture", WINDOW_NORMAL);
 
@@ -44,7 +50,7 @@ void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_
 	}
 }
 
-void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
+void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_Name) {
 
 	// get video
 	Mat bright, brightHSV;
@@ -52,8 +58,8 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
 	VideoCapture cap(Video_Path);
 	/*End Video Parameters*/
 
-	string CSV_NAME = "\\TEST.csv";
-	string MP4_NAME = "\\TEST.avi";
+	string CSV_NAME = File_Name + ".csv";
+	string MP4_NAME = File_Name + ".avi";
 
 	namedWindow("Video Capture", WINDOW_NORMAL);
 	namedWindow("Object Detection", WINDOW_NORMAL);
@@ -93,7 +99,7 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path) {
 		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << endl;
 		// print to console
 		//cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << endl << cv::sum(resultHSV)[0] << endl;
-		cout << "\{ \"x:\"\"" << cap.get(CAP_PROP_POS_MSEC) / 1000 << "\",\"y:\"" << cv::sum(resultHSV)[0] << "\"\}" << endl;
+		//cout << "\{ \"x:\"\"" << cap.get(CAP_PROP_POS_MSEC) / 1000 << "\",\"y:\"" << cv::sum(resultHSV)[0] << "\"\}" << endl;
 		// JSON Format
 		//'{ "name":"John", "age":30, "city":"New York"}'
 
@@ -118,6 +124,7 @@ int main(int argc, char *argv[]) {
 	// Initialize Variables - Not all will be used 
 	string Video_Path;
 	string Output_Directory_Path;
+	string File_Name;
 	double Selected_Frame_TimeStamp;
 	double Trim_Start, Trim_End;
 
@@ -132,30 +139,34 @@ int main(int argc, char *argv[]) {
 	{
 		case 1 :	// 1: Process Video
 		{
-			if (argc != 4) {
+			if (argc != 5) {
 				printf("Invalid usage: Method %s in process %s", first[1], argv[0]);
 			}
 			else {
-				Video_Path = argv[2];
-				Output_Directory_Path = argv[3];
+				Video_Path				= argv[2];
+				Output_Directory_Path	= argv[3];
+				File_Name				= argv[4];
+				File_Name = "\\" + File_Name;
 			}
 
-			ThresholdHSV(Video_Path,Output_Directory_Path);
+			ThresholdHSV(Video_Path, Output_Directory_Path, File_Name);
 
 			break;
 		}
 		case 2 :	// 2: Save Selected Frame
 		{
-			if (argc != 5) {
+			if (argc != 6) {
 				printf("Invalid usage: Method %s in process %s", first[2], argv[0]);
 			}
 			else {
-				Video_Path = argv[2];
-				Output_Directory_Path = argv[3];
+				Video_Path				 = argv[2];
+				Output_Directory_Path	 = argv[3];
 				Selected_Frame_TimeStamp = atof(argv[4]);
+				File_Name				 = argv[5];
+				File_Name = "\\" + File_Name;
 			}
 
-			saveFrame(Video_Path,Output_Directory_Path,Selected_Frame_TimeStamp);
+			saveFrame(Video_Path, Output_Directory_Path, Selected_Frame_TimeStamp, File_Name);
 
 			break;
 		}
