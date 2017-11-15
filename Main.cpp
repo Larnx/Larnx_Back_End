@@ -88,8 +88,8 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 		//-- Detect the object based on HSV Range Values
 		//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
 		//Scalar maxHSV = Scalar(hsvPixel.val[0] + 40, hsvPixel.val[1] + 40, hsvPixel.val[2] + 40);
-		Scalar minHSV = Scalar(65, 17, 140);
-		Scalar maxHSV = Scalar(123, 269, 198);
+		Scalar minHSV = Scalar(45, 1, 1);
+		Scalar maxHSV = Scalar(123, 254, 254);
 
 		Mat maskHSV, resultHSV;
 		inRange(brightHSV, minHSV, maxHSV, maskHSV);
@@ -103,7 +103,9 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 		// JSON Format
 		//'{ "name":"John", "age":30, "city":"New York"}'
 
-		cout << cv::sum(resultHSV)[0] << endl;
+		cout << (cv::sum(resultHSV)[0] / (1280 * 720 / 2)) << endl; // sort of a ratio- just dividing by frame area/2 (from observation)
+
+		cvtColor(resultHSV, resultHSV, COLOR_HSV2BGR); // convert back to rgb
 
 		writer.write(resultHSV);
 
@@ -115,6 +117,85 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 	outputFile.close();
 }
 
+void contourTrack(string Video_Path, string Output_Directory_Path) {
+	// get video
+	Mat bright, brightHSV;
+	// VideoCapture cap(Video_Path);
+	VideoCapture cap(Video_Path);
+	/*End Video Parameters*/
+
+	namedWindow("Video Capture", WINDOW_NORMAL);
+	namedWindow("Object Tracking", WINDOW_NORMAL);
+
+	/* Current Functions: Track green residue with bound contours and boxes*/
+
+	// Write new video
+	string filenameVDO = "NewTrack.avi"; // saves original video with bounding boxes
+
+	// get frame size
+	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));  // frame width = 1280, height = 720
+	int fps = cap.get(CAP_PROP_FPS); // 30 frames per second
+
+									 // create output window
+	VideoWriter writer;
+	writer.open(Output_Directory_Path + filenameVDO, 0, fps, frameSize, 1);
+
+	while ((char)waitKey(1) != 'q') {
+		cap >> bright; // frame width = 1280, height = 720
+		if (bright.empty())
+			break;
+
+		// convert to HSV color space
+		cvtColor(bright, brightHSV, COLOR_BGR2HSV);
+
+		//-- Detect the object based on HSV Range Values
+		//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
+		//Scalar maxHSV = Scalar(hsvPixel.val[0] + 40, hsvPixel.val[1] + 40, hsvPixel.val[2] + 40);
+		Scalar minHSV = Scalar(45, 1, 1);
+		Scalar maxHSV = Scalar(125, 254, 254);
+
+		Mat maskHSV, resultHSV;
+		inRange(brightHSV, minHSV, maxHSV, maskHSV);
+		bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
+
+		// Find contours
+		vector<vector<Point> > contours;
+		vector<Vec4i> hierarchy;
+		findContours(maskHSV, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+		Mat brightClone = bright.clone();
+		// Approximate Contours to resize the contours
+		vector<vector<Point> > contours_poly(contours.size());
+		for (int i = 0; i < contours.size(); i++) {
+			approxPolyDP(Mat(contours[i]), contours_poly[i], 30, true); // Can change max distance between contours for merging
+			vector<Point> hull;
+			convexHull(Mat(contours_poly[i]), hull);
+			Mat hull_points(hull);
+			RotatedRect rotated_bounding_rect = minAreaRect(hull_points); // rotated rectangle created for each merged contour
+			Point2f vertices[4];
+			if (rotated_bounding_rect.size.area() == 0) {
+				continue;
+			}
+			rotated_bounding_rect.points(vertices);
+			for (int i = 0; i < 4; ++i)
+			{
+				line(brightClone, vertices[i], vertices[(i + 1) % 4], Scalar(0, 255, 0), 0, CV_AA); // rotated rect border is green
+
+			}
+			// Draw the bound box of each rotated rectangle
+			Rect brect = rotated_bounding_rect.boundingRect();
+			rectangle(brightClone, brect, Scalar(0, 0, 255), 3); // bounding box border is red
+
+		}
+
+		writer.write(brightClone);
+
+		imshow("Video Capture", bright);
+		imshow("Object Tracking", brightClone);
+
+	}
+
+
+}
 
 int main(int argc, char *argv[]) {
 
@@ -133,6 +214,7 @@ int main(int argc, char *argv[]) {
 	first[1] = "Process Video";
 	first[2] = "Save Frame";
 	first[3] = "Trim Video";
+	first[4] = "Track object";
 
 
 	switch (method) 
@@ -186,6 +268,21 @@ int main(int argc, char *argv[]) {
 
 			break;
 		}
+		case 4:    // 4. Track Object
+		{
+			if (argc != 4) {
+				printf("Invalid usage: Method %s in process %s", first[4], argv[0]);
+			}
+			else {
+				Video_Path = argv[2];
+				Output_Directory_Path = argv[3];
+			}
+
+			contourTrack(Video_Path, Output_Directory_Path);
+
+			break;
+		}
+
 		default: 
 			break;
 	}
