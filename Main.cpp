@@ -196,7 +196,7 @@ void contourTrack(string Video_Path, string Output_Directory_Path, string File_N
 	}
 }
 
-void histogramAnalysis(string Video_Path, string Output_Directory_Path, string File_Name) {
+void histogramAnalysis(string Video_Path, string Frame_Path, string Output_Directory_Path, string File_Name) {
 	// For now just displays histogram for each video frame
 	// get video
 	Mat bright, brightHSV;
@@ -210,7 +210,31 @@ void histogramAnalysis(string Video_Path, string Output_Directory_Path, string F
 	namedWindow("Histogram Analysis", WINDOW_NORMAL);
 
 	/* Current Function: Display the Hue channel histogram of the HSV colorspace of each video frame*/
-	/* Future Functions: Compare histograms and be able to detect alien object from histogram anomalies*/
+	/* Future Functions: Compare each frame histogram to that of no residue,
+	then may be able to calculate the difference and thus how much alien object is in the frame
+	from these histogram anomalies*/
+
+	// ideally get frame by having user input frame chosen from save frame function
+	Mat src, hsv;
+	src = imread(Frame_Path);
+	cvtColor(src, hsv, CV_BGR2HSV);
+
+	// Separate the image in 3 places ( B, G and R )
+	vector<Mat> img_plane;
+	split(src, img_plane);
+
+	// Intialize video frame histogram
+	// Establish the number of bins
+	int histSizeH = 180; // H: 0 -179
+						 // int histSizeSV = 256; // S, V: 0- 255
+						 // int histSize = 64; // RGB = 0 -255
+
+						 // Set the ranges ( for H,S,V )
+	float range[] = { 0, 180 }; // upper bound inclusive
+								// float range[] = { 0, 256 };
+	const float* histRange = { range };
+
+	bool uniform = true; bool accumulate = false; // histogram bins will be same size and are cleared in the beginning
 
 	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT)); // frame width = 1280, height = 720
 	int fps = cap.get(CAP_PROP_FPS);													// 30 frames per second
@@ -225,31 +249,18 @@ void histogramAnalysis(string Video_Path, string Output_Directory_Path, string F
 
 		cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
 
-													// vector<Mat> hsv_planes;						// Separate the image in 3 places ( H, S, and V)
-		vector<Mat> hsv_planes;							// Separate the image in 3 places ( B, G, and R)
+		vector<Mat> hsv_planes;						// Separate the frame in 3 places ( H, S, and V)
 		split(brightHSV, hsv_planes);				// split channels of HSV
 													//split(bright, bgr_planes);
 
-													// Establish the number of bins
-		int histSizeH = 181; // H: 0 -180
-							 // int histSizeSV = 256; // S, V: 0- 255
-							 // int histSize = 64; // RGB = 0 -255
-
-							 // Set the ranges ( for H,S,V )
-		float range[] = { 0, 181 }; // upper bound inclusive
-									// float range[] = { 0, 256 };
-		const float* histRange = { range };
-
-		bool uniform = true; bool accumulate = false; // histogram bins will be same size and are cleared in the beginning
-
-		Mat h_hist, s_hist, v_hist;
-
-		// Compute the histograms:
+		Mat h_hist, img_hist; //, s_hist, v_hist;
+							  // Compute the histograms:
 		calcHist(&hsv_planes[0], 1, 0, Mat(), h_hist, 1, &histSizeH, &histRange, uniform, accumulate); // dim = 1, channel = 0;
-																									   // calcHist(&bgr_planes[1], 1, 0, Mat(), s_hist, 1, &histSize, &histRange, uniform, accumulate);
-																									   // calcHist(&bgr_planes[2], 1, 0, Mat(), v_hist, 1, &histSize, &histRange, uniform, accumulate);
+		calcHist(&img_plane[0], 1, 0, Mat(), img_hist, 1, &histSizeH, &histRange, uniform, accumulate);
+		// calcHist(&bgr_planes[1], 1, 0, Mat(), s_hist, 1, &histSize, &histRange, uniform, accumulate);
+		// calcHist(&bgr_planes[2], 1, 0, Mat(), v_hist, 1, &histSize, &histRange, uniform, accumulate);
 
-																									   // Draw the histograms for H, S and V
+		// Draw the histograms for H, S and V
 		int hist_w = cap.get(CV_CAP_PROP_FRAME_WIDTH); int hist_h = cap.get(CV_CAP_PROP_FRAME_HEIGHT);
 		int bin_wH = cvRound((double)hist_w / histSizeH);
 		// int bin_wSV = cvRound((double)hist_w / histSizeSV);
@@ -259,15 +270,26 @@ void histogramAnalysis(string Video_Path, string Output_Directory_Path, string F
 
 		// Normalize the result to [ 0, histImage.rows ]
 		normalize(h_hist, h_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
-		normalize(s_hist, s_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
-		normalize(v_hist, v_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+		normalize(img_hist, img_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+		// normalize(s_hist, s_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+		// normalize(v_hist, v_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+
+		// output the total pixels of alien object (in green range of HSV: 45-123)
+		int baseGreen = sum(img_hist(Range(45, 124), Range::all()))[0] > 0 ? sum(img_hist(Range(45, 124), Range::all()))[0] : 0;
+		int alienPixels = sum(h_hist(Range(45, 124), Range::all()))[0] - baseGreen > 0 ?
+			sum(h_hist(Range(45, 124), Range::all()))[0] - baseGreen : 0;
+		cout << alienPixels << '\n';
+		// cout << sum(h_hist(Range(45, 124), Range::all()))[0] << '\n';
 
 		// Draw for each channel
 		for (int i = 1; i < histSizeH; i++)
 		{
 			line(histImage, Point(bin_wH*(i - 1), hist_h - cvRound(h_hist.at<float>(i - 1))),
 				Point(bin_wH*(i), hist_h - cvRound(h_hist.at<float>(i))),
-				Scalar(128, 0, 128), 2, 8, 0);
+				Scalar(0, 255, 0), 2, 8, 0);
+			line(histImage, Point(bin_wH*(i - 1), hist_h - cvRound(img_hist.at<float>(i - 1))),
+				Point(bin_wH*(i), hist_h - cvRound(img_hist.at<float>(i))),
+				Scalar(0, 0, 255), 2, 8, 0);
 		}
 
 		/*for (int i = 1; i < histSizeSV; i++) {
@@ -393,17 +415,18 @@ int main(int argc, char *argv[]) {
 		}
 		case 5:		// 5. Histogram Analysis
 		{
-			if (argc != 5) {
+			if (argc != 6) {
 				printf("Invalid usage: Method %s in process %s", first[5], argv[0]);
 			}
 			else {
 				Video_Path = argv[2];
-				Output_Directory_Path = argv[3];
-				File_Name = argv[4];
+				Frame_Path = argv[3];
+				Output_Directory_Path = argv[4];
+				File_Name = argv[5];
 				File_Name = "\\" + File_Name;
 			}
 
-			histogramAnalysis(Video_Path, Output_Directory_Path, File_Name);
+			histogramAnalysis(Video_Path, Frame_Path, Output_Directory_Path, File_Name);
 			break;
 		}
 		default: 
