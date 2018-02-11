@@ -19,8 +19,8 @@
 using namespace std;
 using namespace cv;
 
-double const	fps = 30;
-double const	timeStep = 1 / fps;
+//double const	fps = 30;
+//double const	timeStep = 1 / fps;
 
 
 void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_Frame_TimeStamp, string File_Name)
