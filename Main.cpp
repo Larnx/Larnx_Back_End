@@ -103,8 +103,8 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 		// JSON Format
 		//'{ "name":"John", "age":30, "city":"New York"}'
 
-		cout << (cv::sum(resultHSV)[0] / (1280 * 720 / 2)) << endl; // sort of a ratio- just dividing by frame area/2 (from observation)
-
+		//cout << (cv::sum(resultHSV)[0] / (1280 * 720 / 2)) << endl; // sort of a ratio- just dividing by frame area/2 (from observation)
+		cout << (cv::sum(resultHSV)[0]) << endl;
 		cvtColor(resultHSV, resultHSV, COLOR_HSV2BGR); // convert back to rgb
 
 		writer.write(resultHSV);
