@@ -7,6 +7,7 @@
 	Kestutis Subacius
 */
 
+#define _CRT_SECURE_NO_WARNINGS
 #include<opencv2/core/core.hpp>
 #include "opencv2/calib3d/calib3d.hpp"
 #include<opencv2/highgui/highgui.hpp>
@@ -326,6 +327,290 @@ void histogramAnalysis(string Video_Path, string Frame_Path, string Output_Direc
 
 }
 
+void readCalibration(VideoCapture capLeft, VideoCapture capRight, int num_images,
+	int img_width, int img_height, char* imgsLeft_directory,
+	char* imgsRight_directory, char* extension, char* stereo_calibration_filename) {
+
+	Mat imgLeft, img_resLeft, imgRight, img_resRight;
+
+	while ((char)waitKey(1) != 'q') {
+
+		capLeft >> imgLeft;
+		capRight >> imgRight;
+
+		if (imgLeft.empty()) break;
+		if (imgRight.empty()) break;
+
+		resize(imgLeft, img_resLeft, Size(img_width, img_height));
+		resize(imgRight, img_resRight, Size(img_width, img_height));
+
+		imshow("IMGLeft", imgLeft);
+		imshow("IMGRight", imgRight);
+
+		if ((char)waitKey(1) == 's') {
+			num_images++;
+			char filenameLeft[200], filenameRight[200];
+			sprintf(filenameLeft, "%s/%sleft%d.%s", stereo_calibration_filename, imgsLeft_directory, num_images, extension);
+			sprintf(filenameRight, "%s/%sright%d.%s", stereo_calibration_filename, imgsRight_directory, num_images, extension);
+			cout << "Saving img pair " << num_images << endl;
+			imwrite(filenameLeft, img_resLeft);
+			imwrite(filenameRight, img_resRight);
+		}
+	}
+}
+
+void setup_calibration(int board_width, int board_height, int num_imgs,
+	float square_size, char* imgs_directory, char* imgs_filename, char* extension,
+	Mat img, Mat gray, vector<Point2f> corners, vector<vector<Point2f>> image_points,
+	vector<vector<Point3f>> object_points) {
+
+	printf("Getting the board size\n");
+	Size board_size = Size(board_width, board_height);
+	int board_n = board_width * board_height;
+
+
+	for (int k = 1; k <= num_imgs; k++) {
+
+		char img_file[100];
+		sprintf(img_file, "%s%s%d.%s", imgs_directory, imgs_filename, k, extension);
+		img = imread(img_file, CV_LOAD_IMAGE_COLOR);
+		cv::cvtColor(img, gray, CV_BGR2GRAY);
+		printf("%s \n", img_file);
+		bool found = false;
+		found = cv::findChessboardCorners(img, board_size, corners,
+			CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+
+		printf("Checking if found in %s \n", img_file);
+
+		if (found)
+		{
+			cornerSubPix(gray, corners, cv::Size(5, 5), cv::Size(-1, -1),
+				TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+			drawChessboardCorners(gray, board_size, corners, found);
+		}
+
+		vector< Point3f > obj;
+		for (int i = 0; i < board_height; i++)
+			for (int j = 0; j < board_width; j++)
+				obj.push_back(Point3f((float)j * square_size, (float)i * square_size, 0));
+
+		if (found) {
+			cout << k << ". Found corners!" << endl;
+			image_points.push_back(corners);
+			object_points.push_back(obj);
+		}
+	}
+}
+
+double computeReprojectionErrors(const vector< vector< Point3f > >& objectPoints,
+	const vector< vector< Point2f > >& imagePoints,
+	const vector< Mat >& rvecs, const vector< Mat >& tvecs,
+	const Mat& cameraMatrix, const Mat& distCoeffs) {
+	vector< Point2f > imagePoints2;
+	int i, totalPoints = 0;
+	double totalErr = 0, err;
+	vector< float > perViewErrors;
+	perViewErrors.resize(objectPoints.size());
+
+	for (i = 0; i < (int)objectPoints.size(); ++i) {
+		projectPoints(Mat(objectPoints[i]), rvecs[i], tvecs[i], cameraMatrix,
+			distCoeffs, imagePoints2);
+		err = norm(Mat(imagePoints[i]), Mat(imagePoints2), CV_L2);
+		int n = (int)objectPoints[i].size();
+		perViewErrors[i] = (float)std::sqrt(err*err / n);
+		totalErr += err*err;
+		totalPoints += n;
+	}
+	return std::sqrt(totalErr / totalPoints);
+}
+
+
+void intrinsicCalib(int board_width, int board_height, int num_imgs, float square_size,
+	char* imgs_directory, char* imgs_filename, char* out_file, char* extension, Mat img,
+	Mat gray, vector<Point2f> corners, vector<vector<Point2f>> image_points,
+	vector<vector<Point3f>> object_points, char* stereo_calibration_filename) {
+
+	printf("In the intrinsic function\n");
+
+	setup_calibration(board_width, board_height, num_imgs, square_size, imgs_directory, imgs_filename, extension, img, gray, corners, image_points, object_points);
+
+	printf("Starting Calibration\n");
+	Mat K;
+	Mat D;
+	vector< Mat > rvecs, tvecs;
+	int flag = 0;
+	flag |= CV_CALIB_FIX_K4;
+	flag |= CV_CALIB_FIX_K5;
+	cout << "object_points: " << object_points.empty() << endl;
+	cout << "image_points: " << image_points.empty() << endl;
+	cout << "image size: " << img.size() << endl;
+
+	calibrateCamera(object_points, image_points, img.size(), K, D, rvecs, tvecs, flag);
+
+	cout << "Calibration error: " << computeReprojectionErrors(object_points, image_points, rvecs, tvecs, K, D) << endl;
+
+	FileStorage fs(out_file, FileStorage::WRITE);
+	fs << "K" << K;
+	fs << "D" << D;
+	fs << "board_width" << board_width;
+	fs << "board_height" << board_height;
+	fs << "square_size" << square_size;
+	printf("Done Calibration\n");
+}
+
+void load_image_points(int board_width, int board_height, int num_imgs, float square_size,
+	char* leftimg_dir, char* rightimg_dir, char* leftimg_filename, char* rightimg_filename,
+	Mat img1, Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
+	vector< vector< Point2f > > imagePoints1, vector< vector< Point2f > > imagePoints2,
+	vector< vector< Point3f > > object_points, vector< vector< Point2f > > left_img_points,
+	vector< vector< Point2f > > right_img_points, char* stereo_calibration_filename) {
+
+	Size board_size = Size(board_width, board_height);
+	int board_n = board_width * board_height;
+
+	for (int i = 1; i <= num_imgs; i++) {
+		char left_img[100], right_img[100];
+		sprintf(left_img, "%s/%s%s%d.jpg", stereo_calibration_filename, leftimg_dir, leftimg_filename, i);
+		sprintf(right_img, "%s/%s%s%d.jpg", stereo_calibration_filename, rightimg_dir, rightimg_filename, i);
+		img1 = imread(left_img, CV_LOAD_IMAGE_COLOR);
+		img2 = imread(right_img, CV_LOAD_IMAGE_COLOR);
+		cvtColor(img1, gray1, CV_BGR2GRAY);
+		cvtColor(img2, gray2, CV_BGR2GRAY);
+
+		bool found1 = false, found2 = false;
+
+		found1 = cv::findChessboardCorners(img1, board_size, corners1,
+			CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+		found2 = cv::findChessboardCorners(img2, board_size, corners2,
+			CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+
+		if (found1)
+		{
+			cv::cornerSubPix(gray1, corners1, cv::Size(5, 5), cv::Size(-1, -1),
+				cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+			cv::drawChessboardCorners(gray1, board_size, corners1, found1);
+		}
+		if (found2)
+		{
+			cv::cornerSubPix(gray2, corners2, cv::Size(5, 5), cv::Size(-1, -1),
+				cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+			cv::drawChessboardCorners(gray2, board_size, corners2, found2);
+		}
+
+		vector< Point3f > obj;
+		for (int i = 0; i < board_height; i++)
+			for (int j = 0; j < board_width; j++)
+				obj.push_back(Point3f((float)j * square_size, (float)i * square_size, 0));
+
+		if (found1 && found2) {
+			cout << i << ". Found corners!" << endl;
+			imagePoints1.push_back(corners1);
+			imagePoints2.push_back(corners2);
+			object_points.push_back(obj);
+		}
+	}
+	for (int i = 0; i < imagePoints1.size(); i++) {
+		vector< Point2f > v1, v2;
+		for (int j = 0; j < imagePoints1[i].size(); j++) {
+			v1.push_back(Point2f((double)imagePoints1[i][j].x, (double)imagePoints1[i][j].y));
+			v2.push_back(Point2f((double)imagePoints2[i][j].x, (double)imagePoints2[i][j].y));
+		}
+		left_img_points.push_back(v1);
+		right_img_points.push_back(v2);
+	}
+}
+
+
+void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* leftimg_dir, char* rightimg_dir, char* leftimg_filename, char* rightimg_filename, char* out_file, int num_imgs, Mat img1,
+	Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
+	vector< vector< Point2f > > imagePoints1, vector< vector< Point2f > > imagePoints2,
+	vector< vector< Point3f > > object_points, vector< vector< Point2f > > left_img_points,
+	vector< vector< Point2f > > right_img_points, char* stereo_calibration_filename) {
+
+	FileStorage fsl(leftcalib_file, FileStorage::READ);
+	FileStorage fsr(rightcalib_file, FileStorage::READ);
+
+	load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"],
+		leftimg_dir, rightimg_dir, leftimg_filename, rightimg_filename, img1, img2,
+		gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
+		left_img_points, right_img_points, stereo_calibration_filename);
+
+	printf("Starting Calibration\n");
+	Mat K1, K2, R, F, E;
+	Vec3d T;
+	Mat D1, D2;
+	fsl["K"] >> K1;
+	fsr["K"] >> K2;
+	fsl["D"] >> D1;
+	fsr["D"] >> D2;
+	int flag = 0;
+	flag |= CV_CALIB_FIX_INTRINSIC;
+
+	cout << "Read intrinsics" << endl;
+
+	stereoCalibrate(object_points, left_img_points, right_img_points, K1, D1, K2, D2, img1.size(), R, T, E, F);
+
+	cv::FileStorage fs1(out_file, cv::FileStorage::WRITE);
+	fs1 << "K1" << K1;
+	fs1 << "K2" << K2;
+	fs1 << "D1" << D1;
+	fs1 << "D2" << D2;
+	fs1 << "R" << R;
+	fs1 << "T" << T;
+	fs1 << "E" << E;
+	fs1 << "F" << F;
+
+	printf("Done Calibration\n");
+
+	printf("Starting Rectification\n");
+
+	cv::Mat R1, R2, P1, P2, Q;
+	stereoRectify(K1, D1, K2, D2, img1.size(), R, T, R1, R2, P1, P2, Q);
+
+	fs1 << "R1" << R1;
+	fs1 << "R2" << R2;
+	fs1 << "P1" << P1;
+	fs1 << "P2" << P2;
+	fs1 << "Q" << Q;
+
+	printf("Done Rectification\n");
+}
+
+void undistort_rectify(Mat img1, Mat img2, char* calib_file, char* leftout_filename, char* rightout_filename) {
+
+	Mat R1, R2, P1, P2, Q;
+	Mat K1, K2, R;
+	Vec3d T;
+	Mat D1, D2;
+	//Mat img1 = imread(leftimg_filename, CV_LOAD_IMAGE_COLOR);
+	//Mat img2 = imread(rightimg_filename, CV_LOAD_IMAGE_COLOR);
+
+	cv::FileStorage fs1(calib_file, cv::FileStorage::READ);
+	fs1["K1"] >> K1;
+	fs1["K2"] >> K2;
+	fs1["D1"] >> D1;
+	fs1["D2"] >> D2;
+	fs1["R"] >> R;
+	fs1["T"] >> T;
+
+	fs1["R1"] >> R1;
+	fs1["R2"] >> R2;
+	fs1["P1"] >> P1;
+	fs1["P2"] >> P2;
+	fs1["Q"] >> Q;
+
+	cv::Mat lmapx, lmapy, rmapx, rmapy;
+	cv::Mat imgU1, imgU2;
+
+	cv::initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32F, lmapx, lmapy);
+	cv::initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy);
+	cv::remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR);
+	cv::remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR);
+
+	imwrite(leftout_filename, imgU1);
+	imwrite(rightout_filename, imgU2);
+}
+
 Mat undistort_rectify_depth_map(Mat img1, Mat img2, FileStorage fs1) {
 	// Computes the undistortion and rectification transformation map - to be called after calibration and rectification function
 	// calibration function saves calibrated parameters in a file and the left and right calibrated images in a calibration directory
@@ -404,6 +689,14 @@ int main(int argc, char *argv[]) {
 	double Selected_Frame_TimeStamp;
 	double Trim_Start, Trim_End;
 	int num_imgs;
+	char* left_initial_video;
+	char* right_initial_video;
+	char* left_image_dir;
+	char* right_image_dir;
+	char* left_calib_filename;
+	char* right_calib_filename;
+	char* stereo_calibration_filename;
+	char* calib_filepath;
 
 	// Keep a dictionary of methods, for error throwing and reference. 
 	std::map<int, string> first;
@@ -413,7 +706,7 @@ int main(int argc, char *argv[]) {
 	first[4] = "Track object";
 	first[5] = "Histogram Analysis";
 	first[6] = "Depth Mapping";
-
+	first[7] = "Calibrate Camera";
 
 	switch (method) 
 	{
@@ -569,6 +862,70 @@ int main(int argc, char *argv[]) {
 					imshow("Disparity Map", dis);
 
 				}
+			}
+			break;
+		}
+		case 7:		// Calibrate Camera
+		{
+			if (argc != 10) {
+				printf("Invalide usage: Method %s in process %s", first[7], argv[0]);
+			}
+			else {
+				// left calibration video
+				left_initial_video = argv[2];
+
+				// right calibration video
+				right_initial_video = argv[3];
+
+				// left image directory
+				left_image_dir = argv[4];
+
+				// right image directory
+				right_image_dir = argv[5];
+
+				// intrinsic calib output file
+				left_calib_filename = argv[6];
+				right_calib_filename = argv[7];
+
+				// extrinsic Calibration
+				stereo_calibration_filename = argv[8];
+
+				// filepath to save .yml, jpg, and left & right img imgs_directory
+				calib_filepath = argv[9];
+
+
+				int x; // num of images
+
+				vector< vector< Point3f > > object_points;
+
+				// intrinsic one camera calibration
+				vector< vector< Point2f > > image_points;
+				vector< Point2f > corners;
+
+				Mat img, gray;
+				Size im_size;
+
+				// extrinsic two-camera calibration
+				vector< vector< Point2f > > imagePoints1, imagePoints2;
+				vector< Point2f > corners1, corners2;
+				vector< vector< Point2f > > left_img_points, right_img_points;
+
+				Mat img1, img2, gray1, gray2;
+
+				VideoCapture capLeft(left_initial_video);
+				VideoCapture capRight(right_initial_video);
+
+				// get test images to calibrate
+				readCalibration(capLeft, capRight, x, 1280, 720, left_image_dir, right_image_dir, "jpg", stereo_calibration_filename);
+
+				intrinsicCalib(8, 8, x, 20.06375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
+					corners, image_points, object_points, stereo_calibration_filename);
+
+				intrinsicCalib(8, 8, x, 20.06375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
+					corners, image_points, object_points, stereo_calibration_filename);
+
+				extrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, "left", "right", stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
+					left_img_points, right_img_points, stereo_calibration_filename);
 			}
 			break;
 		}
