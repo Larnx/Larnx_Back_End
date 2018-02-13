@@ -8,6 +8,7 @@
 */
 
 #include<opencv2/core/core.hpp>
+#include "opencv2/calib3d/calib3d.hpp"
 #include<opencv2/highgui/highgui.hpp>
 #include<opencv2/imgproc/imgproc.hpp>
 #include <iostream>
@@ -325,6 +326,71 @@ void histogramAnalysis(string Video_Path, string Frame_Path, string Output_Direc
 
 }
 
+Mat undistort_rectify_depth_map(Mat img1, Mat img2, FileStorage fs1) {
+	// Computes the undistortion and rectification transformation map - to be called after calibration and rectification function
+	// calibration function saves calibrated parameters in a file and the left and right calibrated images in a calibration directory
+	// Stereo image rectification projects images onto a common image plane in such a way that the corresponding points have the same row coordinates. This image projection makes the image appear as though the two cameras are parallel.
+	// rectification function calculates the rectification transform which will be used to undistort and remap the calibrated images in the rectification transform map
+	// img1, img2 are the left and right calibrated images
+	// variable that contains calibration parameters
+
+
+	Mat R1, R2, P1, P2, Q;
+	Mat K1, K2, R;
+	Vec3d T;
+	Mat D1, D2;
+
+	// load calibration parameters used to calculate the rectification transform amp
+	fs1["K1"] >> K1;
+	fs1["K2"] >> K2;
+	fs1["D1"] >> D1;
+	fs1["D2"] >> D2;
+	fs1["R"] >> R;
+	fs1["T"] >> T;
+
+	fs1["R1"] >> R1;
+	fs1["R2"] >> R2;
+	fs1["P1"] >> P1;
+	fs1["P2"] >> P2;
+	fs1["Q"] >> Q;
+
+	Mat lmapx, lmapy, rmapx, rmapy;
+	Mat imgU1, imgU2;
+
+	// Generates a rectification transform map
+	initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32F, lmapx, lmapy); // left
+	initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy); // right
+																				// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
+	remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // left
+	remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // right
+
+														// calls depth/ disparity map function
+	return disparityMapping(imgU1, imgU2);
+}
+
+Mat disparityMapping(Mat imgU1, Mat imgU2) {
+	// Creates depth map from stereo videos; after calibrating and rectifying images, can determine the depth of a point in frame 
+
+	Mat disparity, disparity8;
+
+	// set parameters for StereoBM object - NEED TO PLAY AROUND TO FIND OPTIMUM
+	int numOfDisparities = 16; // max disparities must be positive integer divisible by 16
+	int blockSize = 9; // block size (window size) must be positive odd
+	Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
+	/*sbm->setPreFilterCap(31);
+	sbm->setTextureThreshold(10);
+	sbm->setUniquenessRatio(15);
+	sbm->setSpeckleWindowSize(100);
+	sbm->setSpeckleRange(32);
+	sbm->setDisp12MaxDiff(1);*/
+
+	/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
+	(fixed-point) or 32-bit floating point frame of the same size as the input*/
+	sbm->compute(imgU1, imgU2, disparity);
+	disparity.convertTo(disparity8, CV_8U);
+	return disparity8;
+}
+
 int main(int argc, char *argv[]) {
 
 	// First argument determines behavior
@@ -334,8 +400,10 @@ int main(int argc, char *argv[]) {
 	string Video_Path;
 	string Output_Directory_Path;
 	string File_Name;
+	string leftout_filename, rightout_filename, calib_file;
 	double Selected_Frame_TimeStamp;
 	double Trim_Start, Trim_End;
+	int num_imgs;
 
 	// Keep a dictionary of methods, for error throwing and reference. 
 	std::map<int, string> first;
@@ -344,6 +412,7 @@ int main(int argc, char *argv[]) {
 	first[3] = "Trim Video";
 	first[4] = "Track object";
 	first[5] = "Histogram Analysis";
+	first[6] = "Depth Mapping";
 
 
 	switch (method) 
@@ -427,6 +496,80 @@ int main(int argc, char *argv[]) {
 			}
 
 			histogramAnalysis(Video_Path, Frame_Path, Output_Directory_Path, File_Name);
+			break;
+		}
+		case 6:		// 6. Depth Mapping calibrated and rectified images
+		{
+			if (argc != 10) {
+				printf("Invalid usage: Method %s in process %s", first[6], argv[0]);
+			}
+			else {
+				calibrated_left_path = argv[2]; // directory that has left calibrated images - FOR ASSUME THE CHECKERBOARD IMAGES, BUT SHOULD WORK FOR THROAT TOO
+				calibrated_right_path = argv[3]; // directory that has right calibrated images
+				num_imgs = atoi(argv[4]); // FOR NOW, USER HAS TO INPUT TOTAL CALIBRATED IMAGES IN DIR - Christina is saving 40
+				calib_file = argv[5]; // path and file name of calibration+ rectification parameters
+				leftout_filename = argv[6]; // calibrated + rectified left video
+				rightout_filename = argv[7]; // calibrated + rectified right video
+				Output_Directory_Path = argv[8]; // disparity video path
+				File_Name = argv[9]; // filename of disparity mapping video
+				leftout_filename = "\\" + leftout_filename;
+				rightout_filename = "\\" + rightout_filename;
+				File_Name = "\\" + File_Name;
+
+				Mat img1, img2, dis;
+				Size frameSize = Size(1280, 720); // same as calibration
+				int fps = 30; // assuming 30 fps
+
+							  // load calibration parameters used to calculate the rectification transform amp
+				FileStorage fs(calib_file, cv::FileStorage::READ); // calib_file is a yml file stores all the calibration and rectification parameters
+
+																   // Write new videos
+				File_Name = File_Name + ".avi"; // can change from avi
+				string dis_filename = File_Name;
+				leftout_filename = leftout_filename + ".avi";
+				string left_calib_filename = leftout_filename;
+				rightout_filename = rightout_filename + ".avi";
+				string right_calib_filename = rightout_filename;
+
+				// display window for viewing
+				namedWindow("Calibrated and Rectified Sensor 0", WINDOW_NORMAL);
+				namedWindow("Calibrated and Rectified Sensor 1", WINDOW_NORMAL);
+				namedWindow("Disparity Map", WINDOW_NORMAL);
+
+				// create output window
+				VideoWriter writer_left, writer_right, writer_dis;
+				writer_left.open(Output_Directory_Path + left_calib_filename, 0, fps, frameSize, 1);
+				writer_right.open(Output_Directory_Path + right_calib_filename, 0, fps, frameSize, 1);
+				writer_dis.open(Output_Directory_Path + dis_filename, 0, fps, frameSize, 1);
+
+
+				for (int i = 1; i <= num_imgs; i++) {
+					// read calibrated images in directory
+					char left_img[100], right_img[100];
+					// MAY NEED TO CHANGE FOR USER
+					sprintf(left_img, "%s%s%d.jpg", calibrated_left_path, "left", i); // In Christina's code path for calibrated images is "calib_imgsLeft/1/"
+					sprintf(right_img, "%s%s%d.jpg", calibrated_right_path, "right", i); // In Christina's code path for calibrated images is "calib_imgsRight/1/"
+					img1 = imread(left_img, CV_LOAD_IMAGE_COLOR);
+					img2 = imread(right_img, CV_LOAD_IMAGE_COLOR);
+
+					// write to videos
+					writer_left.write(img1);
+					writer_right.write(img2);
+
+					// call rectification remapping and disparity map function
+					// pass left and right calibrated images and the parameters
+					dis = undistort_rectify_depth_map(img1, img2, fs); // returns disparity map for each frame
+
+																	   // write to video
+					writer_dis.write(dis);
+
+					// display videos
+					imshow("Calibrated and Rectified Sensor 0", img1);
+					imshow("Calibrated and Rectified Sensor 1", img2);
+					imshow("Disparity Map", dis);
+
+				}
+			}
 			break;
 		}
 		default: 
