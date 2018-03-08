@@ -590,8 +590,8 @@ void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 		resize(imgLeft, img_resLeft, Size(img_width, img_height));
 		resize(imgRight, img_resRight, Size(img_width, img_height));
 
-		imshow("IMGLeft", imgLeft);
-		imshow("IMGRight", imgRight);
+		imshow("Left Camera", imgLeft);
+		imshow("Right Camera", imgRight);
 
 		if ((char)waitKey(1) == 's') {
 			num_images++;
