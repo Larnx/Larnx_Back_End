@@ -573,59 +573,151 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	printf("Done Rectification\n");
 }
 
-void undistort_rectify(Mat img1, Mat img2, FileStorage fs1, Mat imgU1, Mat imgU2) {
+void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
+	int img_width, int img_height, char* imgsLeft_directory,
+	char* imgsRight_directory, char* extension) {
+
+	Mat imgLeft, img_resLeft, imgRight, img_resRight;
+
+	while ((char)waitKey(1) != 'q') {
+
+		capLeft >> imgLeft;
+		capRight >> imgRight;
+
+		if (imgLeft.empty()) break;
+		if (imgRight.empty()) break;
+
+		resize(imgLeft, img_resLeft, Size(img_width, img_height));
+		resize(imgRight, img_resRight, Size(img_width, img_height));
+
+		imshow("IMGLeft", imgLeft);
+		imshow("IMGRight", imgRight);
+
+		if ((char)waitKey(1) == 's') {
+			num_images++;
+			char filenameLeft[200], filenameRight[200];
+			sprintf(filenameLeft, "%s\\left%d.%s", imgsLeft_directory, num_images, extension);
+			sprintf(filenameRight, "%s\\right%d.%s", imgsRight_directory, num_images, extension);
+			cout << "Saving img pair " << num_images << endl;
+			imwrite(filenameLeft, img_resLeft);
+			imwrite(filenameRight, img_resRight);
+		}
+	}
+}
+
+void undistort_rectify(int& num_imgs, string calib_file, char* left_directory, char* left_filename,
+	char* right_directory, char* right_filename, char* extension) {
 	// Computes the undistortion and rectification transformation map - to be called after calibration and rectification function
 
+	Mat img1, img2, imgU1, imgU2;
 	Mat R1, R2, P1, P2, Q;
 	Mat K1, K2, R;
 	Vec3d T;
 	Mat D1, D2;
 
 	// load calibration parameters used to calculate the rectification transform amp
-	fs1["K1"] >> K1;
-	fs1["K2"] >> K2;
-	fs1["D1"] >> D1;
-	fs1["D2"] >> D2;
-	fs1["R"] >> R;
-	fs1["T"] >> T;
+	FileStorage fs(calib_file, cv::FileStorage::READ); // calib_file is a yml file stores all the calibration and rectification parameters
 
-	fs1["R1"] >> R1;
-	fs1["R2"] >> R2;
-	fs1["P1"] >> P1;
-	fs1["P2"] >> P2;
-	fs1["Q"] >> Q;
+													   // load calibration parameters used to calculate the rectification transform amp
+	fs["K1"] >> K1;
+	fs["K2"] >> K2;
+	fs["D1"] >> D1;
+	fs["D2"] >> D2;
+	fs["R"] >> R;
+	fs["T"] >> T;
+
+	fs["R1"] >> R1;
+	fs["R2"] >> R2;
+	fs["P1"] >> P1;
+	fs["P2"] >> P2;
+	fs["Q"] >> Q;
+
+	printf("Calculating rectification transform map and remapping pixel positions\n");
 
 	Mat lmapx, lmapy, rmapx, rmapy;
+	for (int k = 1; k <= num_imgs; k++) {
 
-	// Generates a rectification transform map
-	initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32F, lmapx, lmapy); // left
-	initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy); // right
 
-																				// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
-	remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // left
-	remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // right
+		char img_file1[100], img_file2[100];
+		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
+		printf("Rectifying %s \n", img_file1);
+		img1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
+		cvtColor(img1, img1, CV_BGR2GRAY);
+
+		sprintf(img_file2, "%s\\%s%d.%s", right_directory, right_filename, k, extension);
+		printf("Rectifying %s \n", img_file2);
+		img2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
+		cvtColor(img2, img2, CV_BGR2GRAY);
+
+		Mat imgU1(img1.size(), CV_8UC1);
+		Mat imgU2(img2.size(), CV_8UC1);
+
+		// Generates a rectification transform map
+		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32F, lmapx, lmapy); // left
+		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy); // right
+
+																					// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
+		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // left
+		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // right
+
+		imshow("Rectified Left", imgU1);
+		imshow("Rectified Right", imgU2);
+
+		char img_outfile1[100], img_outfile2[100];
+		sprintf(img_outfile1, "%s\\left_rect%d.%s", left_directory, k, extension);
+		sprintf(img_outfile2, "%s\\right_rect%d.%s", right_directory, k, extension);
+		printf("Saving %s \n", img_outfile1);
+		printf("Saving %s \n", img_outfile2);
+		imwrite(img_outfile1, imgU1);
+		imwrite(img_outfile2, imgU2);
+
+	}
+
 }
 
-void disparityMapping(Mat imgU1, Mat imgU2, Mat dis) {
+void disparityMapping(int& num_imgs, char* left_directory, char* left_filename,
+	char* right_directory, char* right_filename, char* extension, char* Output) {
 	// Creates depth map from stereo videos; after calibrating and rectifying images, can determine the depth of a point in frame 
 
-	Mat disparity;
-
+	Mat disparity, imgU1, imgU2, dis;
 	// set parameters for StereoBM object - NEED TO PLAY AROUND TO FIND OPTIMUM
 	int numOfDisparities = 32; // max disparities must be positive integer divisible by 16
 	int blockSize = 15; // block size (window size) must be positive odd
 	Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
-	/*sbm->setPreFilterCap(31);
-	sbm->setTextureThreshold(10);
-	sbm->setUniquenessRatio(15);
-	sbm->setSpeckleWindowSize(100);
-	sbm->setSpeckleRange(32);
-	sbm->setDisp12MaxDiff(1);*/
 
-	/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
-	(fixed-point) or 32-bit floating point frame of the same size as the input*/
-	sbm->compute(imgU1, imgU2, disparity);
-	disparity.convertTo(dis, CV_8UC1);
+	for (int k = 1; k <= num_imgs; k++) {
+		char img_file1[100], img_file2[100];
+		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
+		sprintf(img_file2, "%s\\%s%d.%s", right_directory, right_filename, k, extension);
+		printf("Calculating disparity of %s and %s\n", img_file1, img_file2);
+		imgU1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
+		imgU2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
+		Mat imgU1(imgU1.size(), CV_8UC1);
+		Mat imgU2(imgU2.size(), CV_8UC1);
+
+		/*sbm->setPreFilterCap(31);
+		sbm->setTextureThreshold(10);
+		sbm->setUniquenessRatio(15);
+		sbm->setSpeckleWindowSize(100);
+		sbm->setSpeckleRange(32);
+		sbm->setDisp12MaxDiff(1);*/
+
+		/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
+		(fixed-point) or 32-bit floating point frame of the same size as the input*/
+		sbm->compute(imgU1, imgU2, disparity);
+		disparity.convertTo(dis, CV_8UC1);
+
+		char dis_file[100];
+		sprintf(dis_file, "%s\\disparity%d.%s", Output, k, extension);
+		printf("Saving to %s \n", dis_file);
+		imwrite(dis_file, dis);
+		char winame[100];
+		sprintf(winame, "Disparity Map %d", k);
+		imshow(winame, dis);
+
+
+		// FIND DEPTH BY INVERTING disparity value???
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -635,7 +727,7 @@ int main(int argc, char *argv[]) {
 
 	// Initialize Variables - Not all will be used 
 	string Video_Path, Video_Path1, Video_Path2, calibrated_left_path, calibrated_right_path;
-	string Output_Directory_Path;
+	char* Output_Directory_Path;
 	string File_Name;
 	string leftout_filename, rightout_filename, calib_file;
 	double Selected_Frame_TimeStamp;
@@ -745,7 +837,7 @@ int main(int argc, char *argv[]) {
 		}
 		case 6:		// 6. Depth Mapping calibrated and rectified images
 		{
-			if (argc != 9) {
+			if (argc != 8) {
 				printf("Invalid usage: Method %s in process %s", first[6], argv[0]);
 			}
 			else {
@@ -753,70 +845,20 @@ int main(int argc, char *argv[]) {
 				Video_Path2 = argv[3]; // directory of right video
 				calib_file = argv[4]; // path and file name of calibration+ rectification parameters
 				Output_Directory_Path = argv[5]; // output video path
-				leftout_filename = argv[6]; // rectified left video
-				rightout_filename = argv[7]; //  rectified right video
-				File_Name = argv[8]; // filename of disparity mapping video
-				leftout_filename = "\\" + leftout_filename;
-				rightout_filename = "\\" + rightout_filename;
-				File_Name = "\\" + File_Name;
+				left_image_dir = argv[6]; // rectified left video
+				right_image_dir = argv[7]; //  rectified right video
 
-
+				int num_imgs = 0;
 				VideoCapture cap1(Video_Path1);
 				VideoCapture cap2(Video_Path2);
-				Mat img1, img2;
-				Size frameSize(cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT)); // frame width = 250, height = 250
-				int fps = cap1.get(CAP_PROP_FPS);
 
-				// load calibration parameters used to calculate the rectification transform amp
-				FileStorage fs(calib_file, cv::FileStorage::READ); // calib_file is a yml file stores all the calibration and rectification parameters
+				// get screenshots images for creating disparity map
+				readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), left_image_dir, right_image_dir, "jpg");
 
-																   // Write new videos
-				File_Name = File_Name + ".avi";
-				string dis_filename = File_Name;
-				leftout_filename = leftout_filename + ".avi";
-				string left_calib_filename = leftout_filename;
-				rightout_filename = rightout_filename + ".avi";
-				string right_calib_filename = rightout_filename;
-
-				// display window for viewing
-				namedWindow("Calibrated and Rectified Sensor 0", CV_WINDOW_NORMAL);
-				namedWindow("Calibrated and Rectified Sensor 1", CV_WINDOW_NORMAL);
-				namedWindow("Disparity Map", CV_WINDOW_NORMAL);
-
-				// create output window
-				VideoWriter writer_left, writer_right, writer_dis;
-				writer_left.open(Output_Directory_Path + left_calib_filename, 0, fps, frameSize, 0);
-				writer_right.open(Output_Directory_Path + right_calib_filename, 0, fps, frameSize, 0);
-				writer_dis.open(Output_Directory_Path + dis_filename, 0, fps, frameSize, 0);
-
-				while ((char)waitKey(1) != 'q') {
-					cap1 >> img1;
-					cap2 >> img2;
-					if (img1.empty() || img2.empty()) {
-						break;
-					}
-
-					cvtColor(img1, img1, CV_BGR2GRAY);
-					cvtColor(img2, img2, CV_BGR2GRAY);
-					Mat imgU1(img1.size(), CV_8UC1);
-					Mat imgU2(img2.size(), CV_8UC1);
-					Mat dis(img1.size(), CV_8UC1);
-
-					// call rectification remapping and disparity map function
-					undistort_rectify(img1, img2, fs, imgU1, imgU2);
-					// returns disparity map for each frame
-					disparityMapping(imgU1, imgU2, dis);
-
-					// write to video
-					writer_left.write(imgU1);
-					writer_right.write(imgU2);
-					writer_dis.write(dis);
-
-					// display videos
-					imshow("Calibrated and Rectified Sensor 0", imgU1);
-					imshow("Calibrated and Rectified Sensor 1", imgU2);
-					imshow("Disparity Map", dis);
-				}
+				// call rectificationfunction
+				undistort_rectify(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg");
+				// returns disparity map for each frame
+				disparityMapping(num_imgs, left_image_dir, "left_rect", right_image_dir, "right_rect", "jpg", Output_Directory_Path);
 			}
 			break;
 		}
