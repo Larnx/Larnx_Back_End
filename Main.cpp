@@ -618,7 +618,6 @@ void undistort_rectify(int& num_imgs, string calib_file, char* left_directory, c
 
 	// load calibration parameters used to calculate the rectification transform amp
 	FileStorage fs(calib_file, cv::FileStorage::READ); // calib_file is a yml file stores all the calibration and rectification parameters
-
 													   // load calibration parameters used to calculate the rectification transform amp
 	fs["K1"] >> K1;
 	fs["K2"] >> K2;
@@ -637,8 +636,6 @@ void undistort_rectify(int& num_imgs, string calib_file, char* left_directory, c
 
 	Mat lmapx, lmapy, rmapx, rmapy;
 	for (int k = 1; k <= num_imgs; k++) {
-
-
 		char img_file1[100], img_file2[100];
 		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
 		printf("Rectifying %s \n", img_file1);
@@ -680,11 +677,30 @@ void disparityMapping(int& num_imgs, char* left_directory, char* left_filename,
 	char* right_directory, char* right_filename, char* extension, char* Output) {
 	// Creates depth map from stereo videos; after calibrating and rectifying images, can determine the depth of a point in frame 
 
-	Mat disparity, imgU1, imgU2, dis;
+	Mat disparity, imgU1, imgU2;
 	// set parameters for StereoBM object - NEED TO PLAY AROUND TO FIND OPTIMUM
-	int numOfDisparities = 32; // max disparities must be positive integer divisible by 16
-	int blockSize = 15; // block size (window size) must be positive odd
+	int numOfDisparities = 112; // max disparities must be positive integer divisible by 16
+	int blockSize = 9; // block size (window size) must be positive odd
 	Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
+	sbm->setPreFilterSize(5); // preFilterCap, preFilterSize, preFilterType - used in filtering the input images before disparity computation. These may improve noise rejection in input images.
+	sbm->setPreFilterCap(1);
+	sbm->setMinDisparity(0);
+	sbm->setTextureThreshold(5); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
+	sbm->setUniquenessRatio(0);
+	sbm->setSpeckleWindowSize(0); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
+	sbm->setSpeckleRange(20);
+	sbm->setDisp12MaxDiff(64);
+
+	/*sbm.state->SADWindowSize = 9;
+	sbm.state->numberOfDisparities = 112;
+	sbm.state->preFilterSize = 5;
+	sbm.state->preFilterCap = 1;
+	sbm.state->minDisparity = 0;
+	sbm.state->textureThreshold = 5;
+	sbm.state->uniquenessRatio = 5;
+	sbm.state->speckleWindowSize = 0;
+	sbm.state->speckleRange = 20;
+	sbm.state->disp12MaxDiff = 64;*/
 
 	for (int k = 1; k <= num_imgs; k++) {
 		char img_file1[100], img_file2[100];
@@ -696,28 +712,62 @@ void disparityMapping(int& num_imgs, char* left_directory, char* left_filename,
 		Mat imgU1(imgU1.size(), CV_8UC1);
 		Mat imgU2(imgU2.size(), CV_8UC1);
 
-		/*sbm->setPreFilterCap(31);
-		sbm->setTextureThreshold(10);
-		sbm->setUniquenessRatio(15);
-		sbm->setSpeckleWindowSize(100);
-		sbm->setSpeckleRange(32);
-		sbm->setDisp12MaxDiff(1);*/
-
 		/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
 		(fixed-point) or 32-bit floating point frame of the same size as the input*/
 		sbm->compute(imgU1, imgU2, disparity);
-		disparity.convertTo(dis, CV_8UC1);
+		Mat disp8;
+		normalize(disparity, disp8, 0, 255, CV_MINMAX, CV_8U);
+		Mat disp16;
+		disp8.convertTo(disp16, CV_32F, 1.0 / 16.0);
+		//disparity.convertTo(dis, CV_8UC1);
 
 		char dis_file[100];
 		sprintf(dis_file, "%s\\disparity%d.%s", Output, k, extension);
 		printf("Saving to %s \n", dis_file);
-		imwrite(dis_file, dis);
+		imwrite(dis_file, disp16);
 		char winame[100];
 		sprintf(winame, "Disparity Map %d", k);
-		imshow(winame, dis);
+		imshow(winame, disp16);
 
+	}
+}
 
-		// FIND DEPTH BY INVERTING disparity value???
+void reprojectionto3D(int& num_imgs, string calib_file, char* dis_directory, char* dis_filename, char* extension, char* Output) {
+	// then reproject to 3D to compute real world coordinates 
+
+	FileStorage fs(calib_file, cv::FileStorage::READ);
+	Mat Q;
+	fs["Q"] >> Q;
+
+	// Reproject image to 3D by OpenCV
+	Mat imgdis, image3D;
+	for (int k = 1; k <= num_imgs; k++) {
+		char img_file[100];
+		sprintf(img_file, "%s\\%s%d.%s", dis_directory, dis_filename, k, extension);
+		printf("Reprojecting %s to 3D \n", img_file);
+		imgdis = imread(img_file, CV_LOAD_IMAGE_COLOR);
+		Mat imgdis(imgdis.size(), CV_8UC1);
+		Mat disp16;
+		imgdis.convertTo(disp16, CV_32F, 1.0 / 16.0);
+		reprojectImageTo3D(disp16, image3D, Q, false, CV_32F);
+
+		char out_file[100];
+		sprintf(out_file, "%s\\reprojection3D_%d.%s", Output, k, extension);
+		printf("Saving to %s \n", out_file);
+		imwrite(out_file, image3D);
+		char winame[100];
+		sprintf(winame, "3D Reprojection %d", k);
+		imshow(winame, image3D);
+
+		// every pixel will have 3D coordinates, can be obtained:
+		for (int x = 0; x < image3D.rows; x++) {
+			for (int y = 0; y < image3D.cols; y++) {
+				Point3f p = image3D.at<Point3f>(x, y);
+				if (p.z >= 10000) continue;  // Filter errors
+											 // depth is p.z
+				printf("Pixel coodinates: %f %f %f \n", p.x, p.y, p.z);  // or print to a file
+			}
+		}
 	}
 }
 
@@ -838,7 +888,7 @@ int main(int argc, char *argv[]) {
 		histogramAnalysis(Video_Path, Frame_Path, Output_Directory_Path, File_Name);
 		break;
 	}
-	case 6:		// 6. Depth Mapping calibrated and rectified images
+	case 6:		// 6. Depth Mapping calibrated and rectified images -> 3D reprojection
 	{
 		if (argc != 8) {
 			printf("Invalid usage: Method %s in process %s", first[6], argv[0]);
@@ -862,6 +912,8 @@ int main(int argc, char *argv[]) {
 			undistort_rectify(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg");
 			// returns disparity map for each frame
 			disparityMapping(num_imgs, left_image_dir, "left_rect", right_image_dir, "right_rect", "jpg", imgs_directory);
+
+			reprojectionto3D(num_imgs, calib_file, imgs_directory, "disparity", "jpg", imgs_directory);
 		}
 		break;
 	}
