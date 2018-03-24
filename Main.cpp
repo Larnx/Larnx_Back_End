@@ -1,10 +1,10 @@
-/* 
-	ECE Senior Design
-	Project Larnx 
+/*
+ECE Senior Design
+Project Larnx
 
-	Napassorn Lerdsudwichai 
-	Christina Howard
-	Kestutis Subacius
+Napassorn Lerdsudwichai
+Christina Howard
+Kestutis Subacius
 */
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -30,12 +30,13 @@ void saveFrame(string Video_Path, string Output_Directory_Path, double Selected_
 
 	namedWindow("Video Capture", WINDOW_NORMAL);
 
+	int timeStep = 1;
 	int frameCount = 0;
 	double currentTime;
 	while ((char)waitKey(1) != 'q')
 	{
-		frameCount++; 
-		currentTime = timeStep*frameCount;
+		frameCount++;
+		currentTime = timeStep * frameCount;
 		double currenttime_ms = 1000 * currentTime;
 
 		cap >> frame;
@@ -70,7 +71,7 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 	ofstream outputFile;
 	outputFile.open(Output_Directory_Path + CSV_NAME);
 	outputFile << "Frame Count" << "," << "Time (sec)" << "," << "Pixel Intensity" << endl; 	// write the file headers for csv
-																							
+
 	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));		// frame width = 1280, height = 720
 	int fps = cap.get(CAP_PROP_FPS);															// 30 frames per second
 
@@ -78,15 +79,15 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 	writer.open(Output_Directory_Path + MP4_NAME, 0, fps, frameSize, 1);
 
 	while ((char)waitKey(1) != 'q') {
-		cap >> bright; 
+		cap >> bright;
 		if (bright.empty())
 			break;
 
 		cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
 
-		//-- Detect the object based on HSV Range Values
-		//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
-		//Scalar maxHSV = Scalar(hsvPixel.val[0] + 40, hsvPixel.val[1] + 40, hsvPixel.val[2] + 40);
+													//-- Detect the object based on HSV Range Values
+													//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
+													//Scalar maxHSV = Scalar(hsvPixel.val[0] + 40, hsvPixel.val[1] + 40, hsvPixel.val[2] + 40);
 		Scalar minHSV = Scalar(45, 1, 1);
 		Scalar maxHSV = Scalar(123, 254, 254);
 
@@ -415,7 +416,7 @@ double computeReprojectionErrors(const vector< vector< Point3f > >& objectPoints
 		err = norm(Mat(imagePoints[i]), Mat(imagePoints2), CV_L2);
 		int n = (int)objectPoints[i].size();
 		perViewErrors[i] = (float)std::sqrt(err*err / n);
-		totalErr += err*err;
+		totalErr += err * err;
 		totalPoints += n;
 	}
 	return std::sqrt(totalErr / totalPoints);
@@ -726,8 +727,8 @@ int main(int argc, char *argv[]) {
 	int method = atoi(argv[1]);
 
 	// Initialize Variables - Not all will be used 
-	string Video_Path, Video_Path1, Video_Path2, calibrated_left_path, calibrated_right_path;
-	char* Output_Directory_Path;
+	string Video_Path, Video_Path1, Video_Path2, calibrated_left_path, calibrated_right_path, Frame_Path;
+	string Output_Directory_Path;
 	string File_Name;
 	string leftout_filename, rightout_filename, calib_file;
 	double Selected_Frame_TimeStamp;
@@ -741,6 +742,7 @@ int main(int argc, char *argv[]) {
 	char* right_calib_filename;
 	char* stereo_calibration_filename;
 	char* calib_filepath;
+	char* imgs_directory;
 
 	// Keep a dictionary of methods, for error throwing and reference. 
 	std::map<int, string> first;
@@ -751,183 +753,247 @@ int main(int argc, char *argv[]) {
 	first[5] = "Histogram Analysis";
 	first[6] = "Depth Mapping";
 	first[7] = "Calibrate Camera";
+	first[8] = "Get Chessboard Videos";
 
-	switch (method) 
+	switch (method)
 	{
-		case 1 :	// 1: Process Video
-		{
-			if (argc != 5) {
-				printf("Invalid usage: Method %s in process %s", first[1], argv[0]);
-			}
-			else {
-				Video_Path				= argv[2];
-				Output_Directory_Path	= argv[3];
-				File_Name				= argv[4];
-				File_Name = "\\" + File_Name;
-			}
-
-			ThresholdHSV(Video_Path, Output_Directory_Path, File_Name);
-
-			break;
+	case 1:	// 1: Process Video
+	{
+		if (argc != 5) {
+			printf("Invalid usage: Method %s in process %s", first[1], argv[0]);
 		}
-		case 2 :	// 2: Save Selected Frame
-		{
-			if (argc != 6) {
-				printf("Invalid usage: Method %s in process %s", first[2], argv[0]);
-			}
-			else {
-				Video_Path				 = argv[2];
-				Output_Directory_Path	 = argv[3];
-				Selected_Frame_TimeStamp = atof(argv[4]);
-				File_Name				 = argv[5];
-				File_Name = "\\" + File_Name;
-			}
-
-			saveFrame(Video_Path, Output_Directory_Path, Selected_Frame_TimeStamp, File_Name);
-
-			break;
+		else {
+			Video_Path = argv[2];
+			Output_Directory_Path = argv[3];
+			File_Name = argv[4];
+			File_Name = "\\" + File_Name;
 		}
-		case 3 :	// 3: Trim Video
-		{
-			if (argc != 5) {
-				printf("Invalid usage: Method %s in process %s", first[3], argv[0]);
-			}
-			else {
-				Video_Path = argv[2];
-				Output_Directory_Path = argv[3];
-				Trim_Start = atof(argv[4]);
-				Trim_End = atof(argv[5]);
-			}
 
-			// Add function call here 
+		ThresholdHSV(Video_Path, Output_Directory_Path, File_Name);
 
-			break;
+		break;
+	}
+	case 2:	// 2: Save Selected Frame
+	{
+		if (argc != 6) {
+			printf("Invalid usage: Method %s in process %s", first[2], argv[0]);
 		}
-		case 4:    // 4. Track Object
-		{
-			if (argc != 5) {
-				printf("Invalid usage: Method %s in process %s", first[4], argv[0]);
-			}
-			else {
-				Video_Path = argv[2];
-				Output_Directory_Path = argv[3];
-				File_Name = argv[4];
-				File_Name = "\\" + File_Name;
-			}
-
-			contourTrack(Video_Path, Output_Directory_Path, File_Name);
-
-			break;
+		else {
+			Video_Path = argv[2];
+			Output_Directory_Path = argv[3];
+			Selected_Frame_TimeStamp = atof(argv[4]);
+			File_Name = argv[5];
+			File_Name = "\\" + File_Name;
 		}
-		case 5:		// 5. Histogram Analysis
-		{
-			if (argc != 6) {
-				printf("Invalid usage: Method %s in process %s", first[5], argv[0]);
-			}
-			else {
-				Video_Path = argv[2];
-				Frame_Path = argv[3];
-				Output_Directory_Path = argv[4];
-				File_Name = argv[5];
-				File_Name = "\\" + File_Name;
-			}
 
-			histogramAnalysis(Video_Path, Frame_Path, Output_Directory_Path, File_Name);
-			break;
+		saveFrame(Video_Path, Output_Directory_Path, Selected_Frame_TimeStamp, File_Name);
+
+		break;
+	}
+	case 3:	// 3: Trim Video
+	{
+		if (argc != 5) {
+			printf("Invalid usage: Method %s in process %s", first[3], argv[0]);
 		}
-		case 6:		// 6. Depth Mapping calibrated and rectified images
-		{
-			if (argc != 8) {
-				printf("Invalid usage: Method %s in process %s", first[6], argv[0]);
-			}
-			else {
-				Video_Path1 = argv[2]; // directory of left video
-				Video_Path2 = argv[3]; // directory of right video
-				calib_file = argv[4]; // path and file name of calibration+ rectification parameters
-				Output_Directory_Path = argv[5]; // output video path
-				left_image_dir = argv[6]; // rectified left video
-				right_image_dir = argv[7]; //  rectified right video
-
-				int num_imgs = 0;
-				VideoCapture cap1(Video_Path1);
-				VideoCapture cap2(Video_Path2);
-
-				// get screenshots images for creating disparity map
-				readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), left_image_dir, right_image_dir, "jpg");
-
-				// call rectificationfunction
-				undistort_rectify(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg");
-				// returns disparity map for each frame
-				disparityMapping(num_imgs, left_image_dir, "left_rect", right_image_dir, "right_rect", "jpg", Output_Directory_Path);
-			}
-			break;
+		else {
+			Video_Path = argv[2];
+			Output_Directory_Path = argv[3];
+			Trim_Start = atof(argv[4]);
+			Trim_End = atof(argv[5]);
 		}
-		case 7:		// Calibrate Camera
-		{
-			if (argc != 10) {
-				printf("Invalide usage: Method %s in process %s", first[7], argv[0]);
-			}
-			else {
-				// left calibration video
-				left_initial_video = argv[2];
 
-				// right calibration video
-				right_initial_video = argv[3];
+		// Add function call here 
 
-				// left image directory
-				left_image_dir = argv[4];
-
-				// right image directory
-				right_image_dir = argv[5];
-
-				// intrinsic calib output file
-				left_calib_filename = argv[6];
-				right_calib_filename = argv[7];
-
-				// extrinsic Calibration
-				stereo_calibration_filename = argv[8];
-
-				// filepath to save .yml, jpg, and left & right img imgs_directory
-				calib_filepath = argv[9];
-
-
-				int x; // num of images
-
-				vector< vector< Point3f > > object_points;
-
-				// intrinsic one camera calibration
-				vector< vector< Point2f > > image_points;
-				vector< Point2f > corners;
-
-				Mat img, gray;
-				Size im_size;
-
-				// extrinsic two-camera calibration
-				vector< vector< Point2f > > imagePoints1, imagePoints2;
-				vector< Point2f > corners1, corners2;
-				vector< vector< Point2f > > left_img_points, right_img_points;
-
-				Mat img1, img2, gray1, gray2;
-
-				VideoCapture capLeft(left_initial_video);
-				VideoCapture capRight(right_initial_video);
-
-				// get test images to calibrate
-				readCalibration(capLeft, capRight, x, 1280, 720, left_image_dir, right_image_dir, "jpg", stereo_calibration_filename);
-
-				intrinsicCalib(8, 8, x, 20.06375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
-					corners, image_points, object_points, stereo_calibration_filename);
-
-				intrinsicCalib(8, 8, x, 20.06375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
-					corners, image_points, object_points, stereo_calibration_filename);
-
-				extrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, "left", "right", stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
-					left_img_points, right_img_points, stereo_calibration_filename);
-			}
-			break;
+		break;
+	}
+	case 4:    // 4. Track Object
+	{
+		if (argc != 5) {
+			printf("Invalid usage: Method %s in process %s", first[4], argv[0]);
 		}
-		default: 
-			break;
+		else {
+			Video_Path = argv[2];
+			Output_Directory_Path = argv[3];
+			File_Name = argv[4];
+			File_Name = "\\" + File_Name;
+		}
+
+		contourTrack(Video_Path, Output_Directory_Path, File_Name);
+
+		break;
+	}
+	case 5:		// 5. Histogram Analysis
+	{
+		if (argc != 6) {
+			printf("Invalid usage: Method %s in process %s", first[5], argv[0]);
+		}
+		else {
+			Video_Path = argv[2];
+			Frame_Path = argv[3];
+			Output_Directory_Path = argv[4];
+			File_Name = argv[5];
+			File_Name = "\\" + File_Name;
+		}
+
+		histogramAnalysis(Video_Path, Frame_Path, Output_Directory_Path, File_Name);
+		break;
+	}
+	case 6:		// 6. Depth Mapping calibrated and rectified images
+	{
+		if (argc != 8) {
+			printf("Invalid usage: Method %s in process %s", first[6], argv[0]);
+		}
+		else {
+			Video_Path1 = argv[2]; // directory of left video
+			Video_Path2 = argv[3]; // directory of right video
+			calib_file = argv[4]; // path and file name of calibration+ rectification parameters
+			imgs_directory = argv[5]; // output video path
+			left_image_dir = argv[6]; // rectified left video
+			right_image_dir = argv[7]; //  rectified right video
+
+			int num_imgs = 0;
+			VideoCapture cap1(Video_Path1);
+			VideoCapture cap2(Video_Path2);
+
+			// get screenshots images for creating disparity map
+			readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), left_image_dir, right_image_dir, "jpg");
+
+			// call rectificationfunction
+			undistort_rectify(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg");
+			// returns disparity map for each frame
+			disparityMapping(num_imgs, left_image_dir, "left_rect", right_image_dir, "right_rect", "jpg", imgs_directory);
+		}
+		break;
+	}
+	case 7:		// 7. Calibrate Camera
+	{
+		if (argc != 10) {
+			printf("Invalide usage: Method %s in process %s", first[7], argv[0]);
+		}
+		else {
+			// left calibration video
+			left_initial_video = argv[2];
+
+			// right calibration video
+			right_initial_video = argv[3];
+
+			// left image directory
+			left_image_dir = argv[4];
+
+			// right image directory
+			right_image_dir = argv[5];
+
+			// intrinsic calib output file
+			left_calib_filename = argv[6];
+			right_calib_filename = argv[7];
+
+			// extrinsic Calibration
+			stereo_calibration_filename = argv[8];
+
+			// filepath to save .yml, jpg, and left & right img imgs_directory
+			calib_filepath = argv[9];
+
+
+			int x = 0; // num of images
+
+			vector< vector< Point3f > > object_points;
+
+			// intrinsic one camera calibration
+			vector< vector< Point2f > > image_points;
+			vector< Point2f > corners;
+
+			Mat img, gray;
+			Size im_size;
+
+			// extrinsic two-camera calibration
+			vector< vector< Point2f > > imagePoints1, imagePoints2;
+			vector< Point2f > corners1, corners2;
+			vector< vector< Point2f > > left_img_points, right_img_points;
+
+			Mat img1, img2, gray1, gray2;
+
+			VideoCapture capLeft(left_initial_video);
+			VideoCapture capRight(right_initial_video);
+
+			// get test images to calibrate
+			readCalibration(capLeft, capRight, x, 1280, 720, left_image_dir, right_image_dir, "jpg", stereo_calibration_filename);
+
+			intrinsicCalib(8, 8, x, 20.06375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
+				corners, image_points, object_points, stereo_calibration_filename);
+
+			intrinsicCalib(8, 8, x, 20.06375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
+				corners, image_points, object_points, stereo_calibration_filename);
+
+			extrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, "left", "right", stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
+				left_img_points, right_img_points, stereo_calibration_filename);
+		}
+		break;
+	}
+	case 8:		// 8. Get Chessboard videos
+	{
+		if (argc != 3) {
+			printf("Invalide usage: Method %s in process %s", first[8], argv[0]);
+		}
+		else {
+
+			imgs_directory = argv[2];
+
+			//The number of connected USB camera(s)
+			const uint CAM_NUM = 2;
+
+			//This will hold the VideoCapture objects
+			VideoCapture camCaptures[CAM_NUM];
+
+			//Initialization of VideoCaptures
+			for (int i = 0; i < CAM_NUM; i++)
+			{
+
+				//Opening camera capture stream
+				camCaptures[i].open(i);
+			}
+
+			/*VideoCapture cap1(1);
+			if (!cap1.isOpened()) cout << "Left CAM doesn't work" << endl;
+			VideoCapture cap2(2);
+			if (!cap2.isOpened()) cout << "Right CAM doesn't work" << endl;*/
+
+			int key = 0;
+			Mat img1, img2;
+			int x = 0; // num of images saved
+
+
+			while (key != 27) { // 27 = ascii value of ESC
+								//cap1 >> img1;
+								//cap2 >> img2;
+				camCaptures[0] >> img1;
+				camCaptures[1] >> img2;
+
+				if (img1.empty()) break;
+				if (img2.empty()) break;
+
+				imshow("CAM1", img1);
+				imshow("CAM2", img2);
+				key = waitKey(10);
+				if (key != 27) { // 27 = ascii value of ESC
+					x++;
+					char filename1[200], filename2[200];
+					sprintf(filename1, "%s/left%d.%s", imgs_directory, x, "jpg");
+					sprintf(filename2, "%s/right%d.%s", imgs_directory, x, "jpg");
+					cout << "Saving img pair " << x << endl;
+					imwrite(filename1, img1);
+					imwrite(filename2, img2);
+				}
+			}
+			//Releasing all VideoCapture resources
+			for (int i = 0; i < CAM_NUM; i++)
+			{
+				camCaptures[i].release();
+			}
+		}
+
+	}
+	default:
+		break;
 	}
 	return 0;
 }
