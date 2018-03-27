@@ -996,18 +996,18 @@ int main(int argc, char *argv[]) {
 			//This will hold the VideoCapture objects
 			VideoCapture camCaptures[CAM_NUM];
 
-			//Initialization of VideoCaptures
+			/*//Initialization of VideoCaptures
 			for (int i = 0; i < CAM_NUM; i++)
 			{
 
-				//Opening camera capture stream
-				camCaptures[i].open(i);
-			}
+			//Opening camera capture stream
+			camCaptures[i].open(i);
+			}*/
 
-			/*VideoCapture cap1(1);
+			VideoCapture cap1(1);
 			if (!cap1.isOpened()) cout << "Left CAM doesn't work" << endl;
 			VideoCapture cap2(2);
-			if (!cap2.isOpened()) cout << "Right CAM doesn't work" << endl;*/
+			if (!cap2.isOpened()) cout << "Right CAM doesn't work" << endl;
 
 			int key = 0;
 			Mat img1, img2;
@@ -1015,10 +1015,10 @@ int main(int argc, char *argv[]) {
 
 
 			while (key != 27) { // 27 = ascii value of ESC
-								//cap1 >> img1;
-								//cap2 >> img2;
-				camCaptures[0] >> img1;
-				camCaptures[1] >> img2;
+				cap1 >> img1;
+				cap2 >> img2;
+				//camCaptures[0] >> img1;
+				//camCaptures[1] >> img2;
 
 				if (img1.empty()) break;
 				if (img2.empty()) break;
@@ -1036,11 +1036,11 @@ int main(int argc, char *argv[]) {
 					imwrite(filename2, img2);
 				}
 			}
-			//Releasing all VideoCapture resources
+			/*//Releasing all VideoCapture resources
 			for (int i = 0; i < CAM_NUM; i++)
 			{
-				camCaptures[i].release();
-			}
+			camCaptures[i].release();
+			}*/
 		}
 
 	}
