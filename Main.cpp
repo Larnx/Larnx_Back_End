@@ -817,6 +817,18 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		// Compute point cloud - reprojection of disparity map to 3D
 		//reprojectImageTo3D(disp16, image3D, Q, false, CV_32F); 
 		reprojectImageTo3D(disp16, depth, Q, false, CV_32F);
+
+
+		// every pixel will have 3D coordinates, can be obtained:
+		for (int x = 0; x < depth.cols; x++) {
+			for (int y = 0; y < depth.rows; y++) {
+				Point3f p = depth.at<Point3f>(y, x); // depth is p.z
+				if (p.z >= 10000) continue;  // Filter errors	 														 											 
+				printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file	 
+			}
+		}
+
+		// save depth
 		sprintf(out_file, "%s\\depth3D_%d.%s", Output, k, extension);
 		printf("Saving to %s \n", out_file);
 		imwrite(out_file, depth);
