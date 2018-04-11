@@ -80,6 +80,10 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 	VideoWriter writer;
 	writer.open(Output_Directory_Path + MP4_NAME, 0, fps, frameSize, 1);
 
+	//-- Trackbars to set thresholds for RGB values
+	//createTrackbar("Low Hue", "Object Detection", &low_h, 255, on_low_h_thresh_trackbar);
+	//createTrackbar("High Hue", "Object Detection", &high_h, 255, on_high_h_thresh_trackbar);
+
 	while ((char)waitKey(1) != 'q') {
 		cap >> bright;
 		if (bright.empty())
@@ -93,7 +97,8 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 		Scalar minHSV = Scalar(45, 1, 1);
 		Scalar maxHSV = Scalar(123, 254, 254);
 
-		Mat maskHSV, resultHSV;
+		Mat maskHSV, resultHSV(brightHSV.size(), CV_8UC3);
+		//inRange(brightHSV, Scalar(low_h, 1, 254), Scalar(high_h, 1, 254), maskHSV);
 		inRange(brightHSV, minHSV, maxHSV, maskHSV);
 		bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
 
@@ -106,7 +111,14 @@ void ThresholdHSV(string Video_Path, string Output_Directory_Path, string File_N
 		//'{ "name":"John", "age":30, "city":"New York"}'
 
 		//cout << (cv::sum(resultHSV)[0] / (1280 * 720 / 2)) << endl; // sort of a ratio- just dividing by frame area/2 (from observation)
-		cout << (cv::sum(resultHSV)[0]) << endl;
+		for (int i = 0; i < maskHSV.size().height; i++) { // Mat - 3 channel Mat<Vec3d> --> Mat<Vec3d>.at(i,j)[0] => hue
+			for (int j = 0; j < maskHSV.size().width; j++) {
+				if (maskHSV.at<Vec3b>(i, j)[0] > 0) {
+					cout << "x: " << j << " , y: " << i << endl;
+				}
+			}
+		}
+		// cout << resultHSV << endl;
 		cvtColor(resultHSV, resultHSV, COLOR_HSV2BGR); // convert back to rgb
 
 		writer.write(resultHSV);
@@ -327,9 +339,9 @@ void histogramAnalysis(string Video_Path, string Frame_Path, string Output_Direc
 
 }
 
-void readCalibration(VideoCapture capLeft, VideoCapture capRight, int num_images,
+void readCalibration(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 	int img_width, int img_height, char* imgsLeft_directory,
-	char* imgsRight_directory, char* extension, char* stereo_calibration_filename) {
+	char* imgsRight_directory, char* extension) {
 
 	Mat imgLeft, img_resLeft, imgRight, img_resRight;
 
@@ -350,9 +362,9 @@ void readCalibration(VideoCapture capLeft, VideoCapture capRight, int num_images
 		if ((char)waitKey(1) == 's') {
 			num_images++;
 			char filenameLeft[200], filenameRight[200];
-			sprintf(filenameLeft, "%s/%sleft%d.%s", stereo_calibration_filename, imgsLeft_directory, num_images, extension);
-			sprintf(filenameRight, "%s/%sright%d.%s", stereo_calibration_filename, imgsRight_directory, num_images, extension);
-			cout << "Saving img pair " << num_images << endl;
+			sprintf(filenameLeft, "%s\\left%d.%s", imgsLeft_directory, num_images, extension);
+			sprintf(filenameRight, "%s\\right%d.%s", imgsRight_directory, num_images, extension);
+			cout << "Saving img pair " << num_images << endl; //  << " at " << imgsLeft_directory << " and " << imgsRight_directory << endl;
 			imwrite(filenameLeft, img_resLeft);
 			imwrite(filenameRight, img_resRight);
 		}
@@ -361,8 +373,8 @@ void readCalibration(VideoCapture capLeft, VideoCapture capRight, int num_images
 
 void setup_calibration(int board_width, int board_height, int num_imgs,
 	float square_size, char* imgs_directory, char* imgs_filename, char* extension,
-	Mat img, Mat gray, vector<Point2f> corners, vector<vector<Point2f>> image_points,
-	vector<vector<Point3f>> object_points) {
+	Mat &img, Mat& gray, vector<Point2f> &corners, vector<vector<Point2f>> &image_points,
+	vector<vector<Point3d>> &object_points) {
 
 	printf("Getting the board size\n");
 	Size board_size = Size(board_width, board_height);
@@ -372,7 +384,8 @@ void setup_calibration(int board_width, int board_height, int num_imgs,
 	for (int k = 1; k <= num_imgs; k++) {
 
 		char img_file[100];
-		sprintf(img_file, "%s%s%d.%s", imgs_directory, imgs_filename, k, extension);
+		sprintf(img_file, "%s\\%s%d.%s", imgs_directory, imgs_filename, k, extension);
+		//cout << "Opening " << img_file << endl;
 		img = imread(img_file, CV_LOAD_IMAGE_COLOR);
 		cv::cvtColor(img, gray, CV_BGR2GRAY);
 		printf("%s \n", img_file);
@@ -389,7 +402,7 @@ void setup_calibration(int board_width, int board_height, int num_imgs,
 			drawChessboardCorners(gray, board_size, corners, found);
 		}
 
-		vector< Point3f > obj;
+		vector< Point3d > obj;
 		for (int i = 0; i < board_height; i++)
 			for (int j = 0; j < board_width; j++)
 				obj.push_back(Point3f((float)j * square_size, (float)i * square_size, 0));
@@ -402,10 +415,11 @@ void setup_calibration(int board_width, int board_height, int num_imgs,
 	}
 }
 
-double computeReprojectionErrors(const vector< vector< Point3f > >& objectPoints,
+double computeReprojectionErrors(const vector< vector< Point3d > >& objectPoints,
 	const vector< vector< Point2f > >& imagePoints,
 	const vector< Mat >& rvecs, const vector< Mat >& tvecs,
 	const Mat& cameraMatrix, const Mat& distCoeffs) {
+	// NOT used in fisheye
 	vector< Point2f > imagePoints2;
 	int i, totalPoints = 0;
 	double totalErr = 0, err;
@@ -413,8 +427,8 @@ double computeReprojectionErrors(const vector< vector< Point3f > >& objectPoints
 	perViewErrors.resize(objectPoints.size());
 
 	for (i = 0; i < (int)objectPoints.size(); ++i) {
-		projectPoints(Mat(objectPoints[i]), rvecs[i], tvecs[i], cameraMatrix,
-			distCoeffs, imagePoints2);
+		projectPoints(Mat(objectPoints[i]), rvecs[i], tvecs[i], cameraMatrix, distCoeffs, imagePoints2);
+		// cv::fisheye::projectPoints(Mat(objectPoints[i]), imagePoints2, rvecs[i], tvecs[i], cameraMatrix, distCoeffs, 0.0, noArray());
 		err = norm(Mat(imagePoints[i]), Mat(imagePoints2), CV_L2);
 		int n = (int)objectPoints[i].size();
 		perViewErrors[i] = (float)std::sqrt(err*err / n);
@@ -424,11 +438,10 @@ double computeReprojectionErrors(const vector< vector< Point3f > >& objectPoints
 	return std::sqrt(totalErr / totalPoints);
 }
 
-
 void intrinsicCalib(int board_width, int board_height, int num_imgs, float square_size,
 	char* imgs_directory, char* imgs_filename, char* out_file, char* extension, Mat img,
 	Mat gray, vector<Point2f> corners, vector<vector<Point2f>> image_points,
-	vector<vector<Point3f>> object_points, char* stereo_calibration_filename) {
+	vector<vector<Point3d>> object_points, char* stereo_calibration_filename) {
 
 	printf("In the intrinsic function\n");
 
@@ -458,22 +471,63 @@ void intrinsicCalib(int board_width, int board_height, int num_imgs, float squar
 	printf("Done Calibration\n");
 }
 
+void fisheyeIntrinsicCalib(int board_width, int board_height, int num_imgs, float square_size, char* imgs_directory, char* imgs_filename,
+	char* out_file, char* extension, Mat img, Mat gray, vector<Point2f> corners, vector<vector<Point2f>> image_points,
+	vector<vector<Point3d>> object_pointsI) {
+
+	printf("In the intrinsic function\n");
+
+	setup_calibration(board_width, board_height, num_imgs, square_size, imgs_directory, imgs_filename, extension, img, gray, corners, image_points, object_pointsI);
+
+	printf("Starting Calibration\n");
+
+	cv::Matx33d K;
+	cv::Vec4d D;
+	vector< Mat > rvecs, tvecs;
+	int flag = 0;
+	flag |= cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC;
+	flag |= cv::fisheye::CALIB_CHECK_COND;
+	flag |= cv::fisheye::CALIB_FIX_SKEW;
+	//flag |= cv::fisheye::CALIB_FIX_K2;
+	//flag |= cv::fisheye::CALIB_FIX_K3;
+	//flag |= cv::fisheye::CALIB_FIX_K4;
+	cout << "object_points: " << object_pointsI.empty() << endl;//changed
+	cout << "img_points: " << image_points.empty() << endl;//changed
+	cout << "image size: " << img.size() << endl;
+
+	cv::fisheye::calibrate(object_pointsI, image_points, img.size(), K, D, rvecs, tvecs, flag, cv::TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 100, DBL_EPSILON));//changed
+
+																																											//cout << "Calibration error: " << computeReprojectionErrors(object_points, image_points, rvecs, tvecs, K, D) << endl;
+
+	FileStorage fs(out_file, FileStorage::WRITE);
+	fs << "K" << Mat(K);
+	fs << "D" << D;
+	fs << "board_width" << board_width;
+	fs << "board_height" << board_height;
+	fs << "square_size" << square_size;
+
+	fs.release();
+
+	printf("Done Calibration\n");
+}
+
 void load_image_points(int board_width, int board_height, int num_imgs, float square_size,
-	char* leftimg_dir, char* rightimg_dir, char* leftimg_filename, char* rightimg_filename,
-	Mat img1, Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
+	char* leftimg_dir, char* rightimg_dir, Mat img1, Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
 	vector< vector< Point2f > > imagePoints1, vector< vector< Point2f > > imagePoints2,
-	vector< vector< Point3f > > object_points, vector< vector< Point2f > > left_img_points,
-	vector< vector< Point2f > > right_img_points, char* stereo_calibration_filename) {
+	vector< vector< Point3d > > &object_points, vector< vector< Point2d > > &left_img_points,
+	vector< vector< Point2d > > &right_img_points) {
 
 	Size board_size = Size(board_width, board_height);
 	int board_n = board_width * board_height;
 
 	for (int i = 1; i <= num_imgs; i++) {
 		char left_img[100], right_img[100];
-		sprintf(left_img, "%s/%s%s%d.jpg", stereo_calibration_filename, leftimg_dir, leftimg_filename, i);
-		sprintf(right_img, "%s/%s%s%d.jpg", stereo_calibration_filename, rightimg_dir, rightimg_filename, i);
+
+		sprintf(left_img, "%s\\%s%d.jpg", leftimg_dir, "left", i);
+		sprintf(right_img, "%s\\%s%d.jpg", rightimg_dir, "right", i);
 		img1 = imread(left_img, CV_LOAD_IMAGE_COLOR);
 		img2 = imread(right_img, CV_LOAD_IMAGE_COLOR);
+		// cout << "Opening: " << left_img  << " and " << right_img << endl;
 		cvtColor(img1, gray1, CV_BGR2GRAY);
 		cvtColor(img2, gray2, CV_BGR2GRAY);
 
@@ -497,10 +551,10 @@ void load_image_points(int board_width, int board_height, int num_imgs, float sq
 			cv::drawChessboardCorners(gray2, board_size, corners2, found2);
 		}
 
-		vector< Point3f > obj;
+		vector< Point3d > obj;
 		for (int i = 0; i < board_height; i++)
 			for (int j = 0; j < board_width; j++)
-				obj.push_back(Point3f((float)j * square_size, (float)i * square_size, 0));
+				obj.push_back(Point3d(double((float)j * square_size), double((float)i * square_size), 0));
 
 		if (found1 && found2) {
 			cout << i << ". Found corners!" << endl;
@@ -510,10 +564,10 @@ void load_image_points(int board_width, int board_height, int num_imgs, float sq
 		}
 	}
 	for (int i = 0; i < imagePoints1.size(); i++) {
-		vector< Point2f > v1, v2;
+		vector< Point2d > v1, v2;
 		for (int j = 0; j < imagePoints1[i].size(); j++) {
-			v1.push_back(Point2f((double)imagePoints1[i][j].x, (double)imagePoints1[i][j].y));
-			v2.push_back(Point2f((double)imagePoints2[i][j].x, (double)imagePoints2[i][j].y));
+			v1.push_back(Point2d((double)imagePoints1[i][j].x, (double)imagePoints1[i][j].y));
+			v2.push_back(Point2d((double)imagePoints2[i][j].x, (double)imagePoints2[i][j].y));
 		}
 		left_img_points.push_back(v1);
 		right_img_points.push_back(v2);
@@ -530,10 +584,10 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	FileStorage fsl(leftcalib_file, FileStorage::READ);
 	FileStorage fsr(rightcalib_file, FileStorage::READ);
 
-	load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"],
-		leftimg_dir, rightimg_dir, leftimg_filename, rightimg_filename, img1, img2,
-		gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
-		left_img_points, right_img_points, stereo_calibration_filename);
+	/*load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"],
+	leftimg_dir, rightimg_dir, leftimg_filename, rightimg_filename, img1, img2,
+	gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
+	left_img_points, right_img_points, stereo_calibration_filename);*/
 
 	printf("Starting Calibration\n");
 	Mat K1, K2, R, F, E;
@@ -576,6 +630,68 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	printf("Done Rectification\n");
 }
 
+void fisheyeExtrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* leftimg_dir, char* rightimg_dir, char* out_file, int num_imgs, Mat img1, Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
+	vector< vector< Point2f > > imagePoints1, vector< vector< Point2f > > imagePoints2,
+	vector< vector< Point3d > > object_pointsE, vector< vector< Point2d > > left_img_points,
+	vector< vector< Point2d > > right_img_points) {
+
+	// TESTING THE GITHUB CODE ----------------------------------------------------------------------------
+	FileStorage fsl(leftcalib_file, FileStorage::READ);
+	FileStorage fsr(rightcalib_file, FileStorage::READ);
+	load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"], leftimg_dir, rightimg_dir,
+		img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_pointsE, left_img_points, right_img_points);
+
+
+	printf("Starting Calibration\n");
+	cv::Matx33d K1, K2, R;
+	cv::Vec3d T;
+	cv::Vec4d D1, D2;
+
+	// Added: get camera matrices from left and right cameras to initialize the following parameters
+	fsl["K"] >> Mat(K1);
+	fsr["K"] >> Mat(K2);
+	//fsl["D1"] >> D1;
+	//fsr["D2"] >> D2;
+
+	int flag = 0;
+	flag |= cv::fisheye::CALIB_USE_INTRINSIC_GUESS; // K1, K2 contains valid initial values of fx, fy, cx, cy that are optimized further. 
+													//flag |= cv::fisheye::CALIB_FIX_INTRINSIC; // Fix K1, K2? and D1, D2? so that only R, T matrices are estimated.
+	flag |= cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC;
+	//flag |= cv::fisheye::CALIB_CHECK_COND; // Assertion Failure occurs when values are -nan not valid
+	flag |= cv::fisheye::CALIB_FIX_SKEW;
+	flag |= cv::fisheye::CALIB_FIX_K1;
+	flag |= cv::fisheye::CALIB_FIX_K2;
+	flag |= cv::fisheye::CALIB_FIX_K3;
+	flag |= cv::fisheye::CALIB_FIX_K4;
+	cv::fisheye::stereoCalibrate(object_pointsE, left_img_points, right_img_points,
+		K1, D1, K2, D2, img1.size(), R, T, flag,
+		cv::TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 100, DBL_EPSILON));//cv::TermCriteria(3, 12, 0));
+
+	cv::FileStorage fs1(out_file, cv::FileStorage::WRITE);
+	fs1 << "K1" << Mat(K1);
+	fs1 << "K2" << Mat(K2);
+	fs1 << "D1" << D1;
+	fs1 << "D2" << D2;
+	fs1 << "R" << Mat(R);
+	fs1 << "T" << T;
+	printf("Done Calibration\n");
+
+	printf("Starting Rectification\n");
+
+	cv::Mat R1, R2, P1, P2, Q;
+	cv::fisheye::stereoRectify(K1, D1, K2, D2, img1.size(), R, T, R1, R2, P1, P2,
+		Q, CV_CALIB_ZERO_DISPARITY, img1.size(), 0.0, 1.1);
+
+	fs1 << "R1" << R1;
+	fs1 << "R2" << R2;
+	fs1 << "P1" << P1;
+	fs1 << "P2" << P2;
+	fs1 << "Q" << Q;
+
+	printf("Done Rectification\n");
+	//return 0;
+}
+
 void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 	int img_width, int img_height, char* imgsLeft_directory, char* imgsRight_directory, char* extension) {
 
@@ -605,8 +721,8 @@ void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 		if ((char)waitKey(5) == 's') { // if press "s" key, will save screenshots
 			num_images++;
 			char filenameLeft[200], filenameRight[200];
-			sprintf(filenameLeft, "%s\\left%d.%s", imgsLeft_directory, num_images, extension);
-			sprintf(filenameRight, "%s\\right%d.%s", imgsRight_directory, num_images, extension);
+			sprintf(filenameLeft, "%s\\left_red%d.%s", imgsLeft_directory, num_images, extension);
+			sprintf(filenameRight, "%s\\right_red%d.%s", imgsRight_directory, num_images, extension);
 			cout << "Saving img pair " << num_images << endl;
 			imwrite(filenameLeft, img_resLeft);
 			imwrite(filenameRight, img_resRight);
@@ -617,24 +733,25 @@ void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 	destroyAllWindows;
 }
 
-void undistort_rectify(int& num_imgs, string calib_file, char* left_directory, char* left_filename,
-	char* right_directory, char* right_filename, char* extension, char* Output) {
-	// Computes the undistortion and rectification transformation map - to be called after calibration and rectification function
+void fisheyeStereoVision(int& num_imgs, string calib_file, char* left_directory, char* left_filename,
+	char* right_directory, char* right_filename, char* extension, char* Output, int numOfDisparities, int blockSize, int minDisparity) {
 
-	Mat img1, img2, imgU1, imgU2;
+	/* After CALIBRATION*/
+
+	// calibration parameters
 	Mat R1, R2, P1, P2, Q;
-	Mat K1, K2, R;
+	Matx33d K1, K2, R;
 	Vec3d T;
-	Mat D1, D2;
+	Vec4d D1, D2;
 
 	// load calibration parameters used to calculate the rectification transform amp
 	FileStorage fs(calib_file, cv::FileStorage::READ); // calib_file is a yml file stores all the calibration and rectification parameters
 													   // load calibration parameters used to calculate the rectification transform amp
-	fs["K1"] >> K1;
-	fs["K2"] >> K2;
+	fs["K1"] >> Mat(K1);
+	fs["K2"] >> Mat(K2);
 	fs["D1"] >> D1;
 	fs["D2"] >> D2;
-	fs["R"] >> R;
+	fs["R"] >> Mat(R);
 	fs["T"] >> T;
 
 	fs["R1"] >> R1;
@@ -642,46 +759,157 @@ void undistort_rectify(int& num_imgs, string calib_file, char* left_directory, c
 	fs["P1"] >> P1;
 	fs["P2"] >> P2;
 	fs["Q"] >> Q;
+	fs.release();
 
 	printf("Calculating rectification transform map and remapping pixel positions\n");
 
+	// rectification transform maps
 	Mat lmapx, lmapy, rmapx, rmapy;
+
+	// left and right images
+	char img_file1[100], img_file2[100];
+	Mat img1, img2;
+
+	// rectified filenames
+	char img_outfile1[100], img_outfile2[100];
+
+	// disparity filename
+	char dis_file[100];
+
+	// 3D filename
+	char out_file[100];
+
 	for (int k = 1; k <= num_imgs; k++) {
-		char img_file1[100], img_file2[100];
+		// --------------------------------------------------------------------------------------
+		/* -- STEREO RECTIFICATION: Computes the UNDISTORTION and RECTIFICATION TRANSFORM MAP -- */
+		// --------------------------------------------------------------------------------------
 		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
 		printf("Rectifying %s \n", img_file1);
 		img1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
-		//cvtColor(img1, img1, CV_BGR2GRAY);
+		cvtColor(img1, img1, CV_BGR2GRAY); // make single channel;
 
 		sprintf(img_file2, "%s\\%s%d.%s", right_directory, right_filename, k, extension);
 		printf("Rectifying %s \n", img_file2);
 		img2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
-		//cvtColor(img2, img2, CV_BGR2GRAY);
+		cvtColor(img2, img2, CV_BGR2GRAY);
 
-		Mat imgU1(img1.size(), CV_8U);
-		Mat imgU2(img2.size(), CV_8U);
+		// rectified left and right image variables
+		Mat imgU1(img1.size(), CV_8UC1);
+		Mat imgU2(img2.size(), CV_8UC1);
 
 		// Generates a rectification transform map
-		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32F, lmapx, lmapy); // left
-		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy); // right
+		// left
+		fisheye::estimateNewCameraMatrixForUndistortRectify(K1, D1, img1.size(), R1, P1, 0.0, img1.size(), 1.0); // Estimates new camera matrix for undistortion or rectification.
+		fisheye::initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // Computes undistortion and rectification maps
+																							   // right
+		fisheye::estimateNewCameraMatrixForUndistortRectify(K2, D2, img2.size(), R2, P2, 0.0, img1.size(), 1.0); // Estimates new camera matrix for undistortion or rectification.
+		fisheye::initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy);
 
-																					// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
-		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // left
-		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // right
+		// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
+		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 
-		imshow("Rectified Left", imgU1);
-		imshow("Rectified Right", imgU2);
-
-		char img_outfile1[100], img_outfile2[100];
-		sprintf(img_outfile1, "%s\\left_rect%d.%s", left_directory, k, extension);
-		sprintf(img_outfile2, "%s\\right_rect%d.%s", right_directory, k, extension);
+		sprintf(img_outfile1, "%s\\left_rect_red_%d.%s", left_directory, k, extension);
+		sprintf(img_outfile2, "%s\\right_rect_red_%d.%s", right_directory, k, extension);
 		printf("Saving %s \n", img_outfile1);
 		printf("Saving %s \n", img_outfile2);
 		imwrite(img_outfile1, imgU1);
 		imwrite(img_outfile2, imgU2);
+		// --------------------------------------------------------------------------------------
+
+		// --------------------------------------------------------------------------------------
+		/* -- DISPARITY MAP GENERATION -- */
+		// --------------------------------------------------------------------------------------
+		// set parameters for StereoBM object - NEED TO PLAY AROUND TO FIND OPTIMUM
+		// numOfDisparities = max disparities must be positive integer divisible by 16
+		// blockSize = block size (window size) must be positive odd
+		// minDisparity = the smallest disparity to search for
+		Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
+		sbm->setMinDisparity(minDisparity);
+		//sbm->setROI1();
+		//sbm->setPreFilterSize(5); // preFilterCap, preFilterSize, preFilterType - used in filtering the input images before disparity computation. These may improve noise rejection in input images.
+		//sbm->setPreFilterCap(1);
+		//sbm->setMinDisparity(-16);
+		//sbm->setTextureThreshold(5); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
+		//sbm->setUniquenessRatio(0);
+		//sbm->setSpeckleWindowSize(0); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
+		//sbm->setSpeckleRange(20);
+		//sbm->setDisp12MaxDiff(64);*/
+
+		printf("Computing disparity for rectified image pair %d\n", k);
+		/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
+		(fixed-point) or 32-bit floating point frame of the same size as the input*/
+		Mat disparity;// (imgU1.size(), CV_8UC1);
+		sbm->compute(imgU1, imgU2, disparity);
+		Mat disp8;// (disparity.size(), CV_8UC1);
+				  // normalize(disparity, disp8, 0, 255, CV_MINMAX, CV_8UC1);
+				  // Check its extreme values
+		double minVal; double maxVal;
+		minMaxLoc(disparity, &minVal, &maxVal);
+		printf("Min disp: %f Max value: %f \n", minVal, maxVal);
+		// Normalize it as a CV_8UC1 image
+		disparity.convertTo(disp8, CV_8UC1, 255 / (maxVal - minVal));
+
+		// To better visualize the result, apply a colormap to the computed disparity
+		Mat cm_disp;
+		applyColorMap(disp8, cm_disp, COLORMAP_JET);
+		//imshow("cm disparity m", cm_disp);
+
+		sprintf(dis_file, "%s\\disparity_red_%d.%s", Output, k, extension);
+		printf("Saving to %s \n", dis_file);
+		//imwrite(dis_file, disparity);
+		imwrite(dis_file, cm_disp);
+		// --------------------------------------------------------------------------------------
 
 
-		// disparityMapping2(imgU1, imgU2, extension, k, Output, Q);
+		// --------------------------------------------------------------------------------------
+		/* -- POINT CLOUD OR 3D REPROJECTION OF DISPARITY MAPS -- */
+		// --------------------------------------------------------------------------------------
+		printf("Computing depth from disparity map %d\n", k);
+		// 3D image from disparity
+		Mat depth;//  (disparity.size(), CV_32F);
+		Mat disp16;
+		disparity.convertTo(disp16, CV_32F, 1.0 / 16.0);
+
+		// Compute point cloud - reprojection of disparity map to 3D
+		reprojectImageTo3D(disp16, depth, Q, false, CV_32F);
+		//reprojectImageTo3D(disparity, depth, Q, false, CV_32F);
+
+		// every pixel will have 3D coordinates, can be obtained:
+		/*for (int x = 0; x < depth.cols; x++) {
+		//for (int y = 0; y < depth.rows; y++) {
+		Point3f p = depth.at<Point3f>(340, x); // depth is p.z
+		if (p.z >= 10000) continue;  // Filter errors
+		printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file
+		//}
+		}*/
+
+		// save depth
+		sprintf(out_file, "%s\\depth3D_red_%d.%s", Output, k, extension);
+		printf("Saving to %s \n", out_file);
+		imwrite(out_file, depth);
+		// --------------------------------------------------------------------------------------
+
+		/*//VISUALIZE POINT CLOUD - VIZ - need to link
+		// Compute a mask to remove background
+		Mat dst, thresholded_disp;
+		threshold(disp8, thresholded_disp, 0, 255, THRESH_OTSU + THRESH_BINARY);
+		//resize(thresholded_disp, dst, Size(640, 480), 0, 0, INTER_LINEAR_EXACT);
+		//imshow("threshold disp otsu", dst);
+
+		// Apply the mask to the point cloud
+		Mat pointcloud_tresh, color_tresh;
+		depth.copyTo(pointcloud_tresh, thresholded_disp);
+		//color.copyTo(color_tresh, thresholded_disp);
+
+		// Show the point cloud on viz
+		viz::Viz3d myWindow("Point cloud with color");
+		myWindow.setBackgroundMeshLab();
+		myWindow.showWidget("coosys", viz::WCoordinateSystem());
+		//myWindow.showWidget("pointcloud", viz::WCloud(pointcloud_tresh, color_tresh));
+		//myWindow.showWidget("text2d", viz::WText("Point cloud", Point(20, 20), 20, viz::Color::green()));
+		myWindow.spin();*/
+
 	}
 
 }
@@ -733,8 +961,9 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 	char out_file[100];
 
 	for (int k = 1; k <= num_imgs; k++) {
-
+		// --------------------------------------------------------------------------------------
 		/* -- STEREO RECTIFICATION: Computes the UNDISTORTION and RECTIFICATION TRANSFORM MAP -- */
+		// --------------------------------------------------------------------------------------
 		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
 		printf("Rectifying %s \n", img_file1);
 		img1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
@@ -754,42 +983,44 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy); // right
 
 																					// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
-		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR);
-		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR);
+		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 
-		sprintf(img_outfile1, "%s\\left_rect%d.%s", left_directory, k, extension);
-		sprintf(img_outfile2, "%s\\right_rect%d.%s", right_directory, k, extension);
+		sprintf(img_outfile1, "%s\\left_rect_%d.%s", left_directory, k, extension);
+		sprintf(img_outfile2, "%s\\right_rect_%d.%s", right_directory, k, extension);
 		printf("Saving %s \n", img_outfile1);
 		printf("Saving %s \n", img_outfile2);
 		imwrite(img_outfile1, imgU1);
 		imwrite(img_outfile2, imgU2);
-		/* -- STEREO RECTIFICATION Complete -- */
+		// --------------------------------------------------------------------------------------
 
-
+		// --------------------------------------------------------------------------------------
 		/* -- DISPARITY MAP GENERATION -- */
+		// --------------------------------------------------------------------------------------
 		// set parameters for StereoBM object - NEED TO PLAY AROUND TO FIND OPTIMUM
 		// numOfDisparities = max disparities must be positive integer divisible by 16
 		// blockSize = block size (window size) must be positive odd
 		// minDisparity = the smallest disparity to search for
 		Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
 		sbm->setMinDisparity(minDisparity);
-		/*sbm->setPreFilterSize(5); // preFilterCap, preFilterSize, preFilterType - used in filtering the input images before disparity computation. These may improve noise rejection in input images.
-		sbm->setPreFilterCap(1);
-		sbm->setMinDisparity(-16);
-		sbm->setTextureThreshold(5); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
-		sbm->setUniquenessRatio(0);
-		sbm->setSpeckleWindowSize(0); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
-		sbm->setSpeckleRange(20);
-		sbm->setDisp12MaxDiff(64);*/
+		//sbm->setROI1();
+		//sbm->setPreFilterSize(5); // preFilterCap, preFilterSize, preFilterType - used in filtering the input images before disparity computation. These may improve noise rejection in input images.
+		//sbm->setPreFilterCap(1);
+		//sbm->setMinDisparity(-16);
+		//sbm->setTextureThreshold(5); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
+		//sbm->setUniquenessRatio(0);
+		//sbm->setSpeckleWindowSize(0); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
+		//sbm->setSpeckleRange(20);
+		//sbm->setDisp12MaxDiff(64);*/
 
 		printf("Computing disparity for rectified image pair %d\n", k);
 		/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
 		(fixed-point) or 32-bit floating point frame of the same size as the input*/
-		Mat disparity(imgU1.size(), CV_8UC1);
+		Mat disparity;// (imgU1.size(), CV_8UC1);
 		sbm->compute(imgU1, imgU2, disparity);
-		Mat disp8(disparity.size(), CV_8UC1);
-		// normalize(disparity, disp8, 0, 255, CV_MINMAX, CV_8UC1);
-		// Check its extreme values
+		Mat disp8;// (disparity.size(), CV_8UC1);
+				  // normalize(disparity, disp8, 0, 255, CV_MINMAX, CV_8UC1);
+				  // Check its extreme values
 		double minVal; double maxVal;
 		minMaxLoc(disparity, &minVal, &maxVal);
 		printf("Min disp: %f Max value: %f \n", minVal, maxVal);
@@ -801,38 +1032,40 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		applyColorMap(disp8, cm_disp, COLORMAP_JET);
 		//imshow("cm disparity m", cm_disp);
 
-		sprintf(dis_file, "%s\\disparity%d.%s", Output, k, extension);
+		sprintf(dis_file, "%s\\disparity_%d.%s", Output, k, extension);
 		printf("Saving to %s \n", dis_file);
-		//imwrite(dis_file, disp8);
+		//imwrite(dis_file, disparity);
 		imwrite(dis_file, cm_disp);
-		/* -- DISPARITY MAP GENERATION COMPLETE -- */
+		// --------------------------------------------------------------------------------------
 
+
+		// --------------------------------------------------------------------------------------
 		/* -- POINT CLOUD OR 3D REPROJECTION OF DISPARITY MAPS -- */
+		// --------------------------------------------------------------------------------------
 		printf("Computing depth from disparity map %d\n", k);
 		// 3D image from disparity
-		Mat depth(disp8.size(), CV_32F);
+		Mat depth;//  (disparity.size(), CV_32F);
 		Mat disp16;
-		disp8.convertTo(disp16, CV_32F, 1.0 / 16.0);
+		disparity.convertTo(disp16, CV_32F, 1.0 / 16.0);
 
 		// Compute point cloud - reprojection of disparity map to 3D
-		//reprojectImageTo3D(disp16, image3D, Q, false, CV_32F); 
 		reprojectImageTo3D(disp16, depth, Q, false, CV_32F);
-
+		//reprojectImageTo3D(disparity, depth, Q, false, CV_32F);
 
 		// every pixel will have 3D coordinates, can be obtained:
-		for (int x = 0; x < depth.cols; x++) {
-			for (int y = 0; y < depth.rows; y++) {
-				Point3f p = depth.at<Point3f>(y, x); // depth is p.z
-				if (p.z >= 10000) continue;  // Filter errors	 														 											 
-				printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file	 
-			}
-		}
+		/*for (int x = 0; x < depth.cols; x++) {
+		//for (int y = 0; y < depth.rows; y++) {
+		Point3f p = depth.at<Point3f>(340, x); // depth is p.z
+		if (p.z >= 10000) continue;  // Filter errors
+		printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file
+		//}
+		}*/
 
 		// save depth
 		sprintf(out_file, "%s\\depth3D_%d.%s", Output, k, extension);
 		printf("Saving to %s \n", out_file);
 		imwrite(out_file, depth);
-		/* -- POINT CLOUD COMPUTATION COMPLETE -- */
+		// --------------------------------------------------------------------------------------
 
 		/*//VISUALIZE POINT CLOUD - VIZ - need to link
 		// Compute a mask to remove background
@@ -856,96 +1089,6 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 
 	}
 
-}
-
-
-void disparityMapping(int& num_imgs, char* left_directory, char* left_filename,
-	char* right_directory, char* right_filename, char* extension, char* Output) {
-	// Creates depth map from stereo videos; after calibrating and rectifying images, can determine the depth of a point in frame 
-
-	Mat disparity, imgU1, imgU2;
-	// set parameters for StereoBM object - NEED TO PLAY AROUND TO FIND OPTIMUM
-	int numOfDisparities = 16; // max disparities must be positive integer divisible by 16
-	int blockSize = 9; // block size (window size) must be positive odd
-	Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
-	/*sbm->setPreFilterSize(5); // preFilterCap, preFilterSize, preFilterType - used in filtering the input images before disparity computation. These may improve noise rejection in input images.
-	sbm->setPreFilterCap(1);
-	sbm->setMinDisparity(0);
-	sbm->setTextureThreshold(5); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
-	sbm->setUniquenessRatio(0);
-	sbm->setSpeckleWindowSize(0); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
-	sbm->setSpeckleRange(20);
-	sbm->setDisp12MaxDiff(64);*/
-
-
-	for (int k = 1; k <= num_imgs; k++) {
-		char img_file1[100], img_file2[100];
-		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
-		sprintf(img_file2, "%s\\%s%d.%s", right_directory, right_filename, k, extension);
-		printf("Calculating disparity of %s and %s\n", img_file1, img_file2);
-		imgU1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
-		imgU2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
-		Mat imgU1(imgU1.size(), CV_8U);
-		Mat imgU2(imgU2.size(), CV_8U);
-
-		/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
-		(fixed-point) or 32-bit floating point frame of the same size as the input*/
-		sbm->compute(imgU1, imgU2, disparity);
-		Mat disp8;
-		normalize(disparity, disp8, 0, 255, CV_MINMAX, CV_8U);
-		Mat disp16;
-		disp8.convertTo(disp16, CV_32F, 1.0 / 16.0);
-		//disparity.convertTo(dis, CV_8UC1);
-
-		char dis_file[100];
-		sprintf(dis_file, "%s\\disparity%d.%s", Output, k, extension);
-		printf("Saving to %s \n", dis_file);
-		imwrite(dis_file, disp16);
-		char winame[100];
-		sprintf(winame, "Disparity Map %d", k);
-		imshow(winame, disp16);
-
-	}
-}
-
-
-void reprojectionto3D(int& num_imgs, string calib_file, char* dis_directory, char* dis_filename, char* extension, char* Output) {
-	// then reproject to 3D to compute real world coordinates 
-
-	FileStorage fs(calib_file, cv::FileStorage::READ);
-	Mat Q;
-	fs["Q"] >> Q;
-
-	// Reproject image to 3D by OpenCV
-	Mat imgdis, image3D;
-	for (int k = 1; k <= num_imgs; k++) {
-		char img_file[100];
-		sprintf(img_file, "%s\\%s%d.%s", dis_directory, dis_filename, k, extension);
-		printf("Reprojecting %s to 3D \n", img_file);
-		imgdis = imread(img_file, CV_LOAD_IMAGE_COLOR);
-		Mat imgdis(imgdis.size(), CV_8U);
-		Mat disp16;
-		imgdis.convertTo(disp16, CV_32F, 1.0 / 16.0);
-		reprojectImageTo3D(disp16, image3D, Q, false, CV_32F);
-
-		char out_file[100];
-		sprintf(out_file, "%s\\reprojection3D_%d.%s", Output, k, extension);
-		printf("Saving to %s \n", out_file);
-		imwrite(out_file, image3D);
-		char winame[100];
-		sprintf(winame, "3D Reprojection %d", k);
-		imshow(winame, image3D);
-
-		// every pixel will have 3D coordinates, can be obtained:
-		for (int x = 0; x < image3D.rows; x++) {
-			for (int y = 0; y < image3D.cols; y++) {
-				Point3f p = image3D.at<Point3f>(x, y);
-				if (p.z >= 10000) continue;  // Filter errors
-											 // depth is p.z
-											 // printf("Pixel coodinates: %f %f %f \n", p.x, p.y, p.z);  // or print to a file
-			}
-		}
-	}
 }
 
 int main(int argc, char *argv[]) {
@@ -985,6 +1128,7 @@ int main(int argc, char *argv[]) {
 	first[6] = "Depth Mapping";
 	first[7] = "Calibrate Camera";
 	first[8] = "Get Chessboard Videos";
+	first[9] = "Get Camera Feeds";
 
 	switch (method)
 	{
@@ -1097,52 +1241,47 @@ int main(int argc, char *argv[]) {
 			readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), left_image_dir, right_image_dir, "jpg");
 
 			// Stereo rectification, disparity map generation, point cloud generatioin
-			StereoVision(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg", imgs_directory, numOfDisparities, blockSize, minDisparity);
-
-			// call rectificationfunction
-			// undistort_rectify(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg", imgs_directory);
-			// returns disparity map for each frame
-			// disparityMapping(num_imgs, left_image_dir, "left_rect", right_image_dir, "right_rect", "jpg", imgs_directory);
-
-			// reprojectionto3D(num_imgs, calib_file, imgs_directory, "disparity", "jpg", imgs_directory);
+			//StereoVision(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg", imgs_directory, numOfDisparities, blockSize, minDisparity);
+			fisheyeStereoVision(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg", imgs_directory, numOfDisparities, blockSize, minDisparity);
 		}
 		break;
 	}
 	case 7:		// 7. Calibrate Camera
 	{
-		if (argc != 10) {
+		if (argc != 9) {
 			printf("Invalide usage: Method %s in process %s", first[7], argv[0]);
 		}
 		else {
+			/*$ .\Main.exe 7 <Video Path 1 --- D:\EC464\VDOs\April_Test\chessboard1.avi>
+			<Video Path 2 --- D:\EC464\VDOs\April_Test\chessboard2.avi>  <left dir for images -- D:\EC464\VDOs\April_Test\Calibration\left>
+			<right dir for images --- D:\EC464\VDOs\April_Test\Calibration\right>
+			<output for calibration left camera -- D:\EC464\VDOs\April_Test\Calibration\cam_left.yml>
+			<output for calibration right camera -- D:\EC464\VDOs\April_Test\Calibration\cam_right.yml>
+			<output for calibration two camera -- D:\EC464\VDOs\April_Test\Calibration\cam.yml>*/
+
 			// left calibration video
 			left_initial_video = argv[2];
-
 			// right calibration video
 			right_initial_video = argv[3];
-
 			// left image directory
 			left_image_dir = argv[4];
-
 			// right image directory
 			right_image_dir = argv[5];
-
 			// intrinsic calib output file
 			left_calib_filename = argv[6];
 			right_calib_filename = argv[7];
-
 			// extrinsic Calibration
 			stereo_calibration_filename = argv[8];
-
 			// filepath to save .yml, jpg, and left & right img imgs_directory
-			calib_filepath = argv[9];
-
-
+			//calib_filepath = argv[9];
 			int x = 0; // num of images
 
-			vector< vector< Point3f > > object_points;
+			vector< vector< Point3d > > object_pointsI;
+			vector< vector< Point3d > > object_pointsE;
 
 			// intrinsic one camera calibration
 			vector< vector< Point2f > > image_points;
+			vector< vector< Point2d > > img_points;
 			vector< Point2f > corners;
 
 			Mat img, gray;
@@ -1151,7 +1290,7 @@ int main(int argc, char *argv[]) {
 			// extrinsic two-camera calibration
 			vector< vector< Point2f > > imagePoints1, imagePoints2;
 			vector< Point2f > corners1, corners2;
-			vector< vector< Point2f > > left_img_points, right_img_points;
+			vector< vector< Point2d > > left_img_points, right_img_points;
 
 			Mat img1, img2, gray1, gray2;
 
@@ -1159,30 +1298,30 @@ int main(int argc, char *argv[]) {
 			VideoCapture capRight(right_initial_video);
 
 			// get test images to calibrate
-			readCalibration(capLeft, capRight, x, 1280, 720, left_image_dir, right_image_dir, "jpg", stereo_calibration_filename);
+			readCalibration(capLeft, capRight, x, 319, 240, left_image_dir, right_image_dir, "jpg");
 
-			intrinsicCalib(8, 8, x, 20.06375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
-				corners, image_points, object_points, stereo_calibration_filename);
+			fisheyeIntrinsicCalib(7, 7, x, 0.02006375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
+				corners, image_points, object_pointsI);
 
-			intrinsicCalib(8, 8, x, 20.06375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
-				corners, image_points, object_points, stereo_calibration_filename);
+			fisheyeIntrinsicCalib(7, 7, x, 0.02006375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
+				corners, image_points, object_pointsI);
 
-			extrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, "left", "right", stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
-				left_img_points, right_img_points, stereo_calibration_filename);
+			fisheyeExtrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_pointsE,
+				left_img_points, right_img_points);
 		}
 		break;
 	}
 	case 8:		// 8. Get Chessboard videos
 	{
 		if (argc != 3) {
-			printf("Invalide usage: Method %s in process %s", first[8], argv[0]);
+			printf("Invalid usage: Method %s in process %s", first[8], argv[0]);
 		}
 		else {
 
 			imgs_directory = argv[2];
 
 			//The number of connected USB camera(s)
-			const uint CAM_NUM = 2;
+			// const uint CAM_NUM = 2;
 
 			//This will hold the VideoCapture objects
 			// VideoCapture camCaptures[CAM_NUM];
@@ -1195,9 +1334,9 @@ int main(int argc, char *argv[]) {
 			camCaptures[i].open(i);
 			}*/
 
-			VideoCapture cap1(1);
+			VideoCapture cap1(0);
 			if (!cap1.isOpened()) cout << "Left CAM doesn't work" << endl;
-			VideoCapture cap2(2);
+			VideoCapture cap2(1);
 			if (!cap2.isOpened()) cout << "Right CAM doesn't work" << endl;
 
 			int key = 0;
@@ -1216,7 +1355,7 @@ int main(int argc, char *argv[]) {
 
 				imshow("CAM1", img1);
 				imshow("CAM2", img2);
-				key = waitKey(10);
+				key = cvWaitKey(10);
 				if (key != 27) { // 27 = ascii value of ESC
 					x++;
 					char filename1[200], filename2[200];
@@ -1234,6 +1373,57 @@ int main(int argc, char *argv[]) {
 			}*/
 		}
 
+	}
+	case 9: // Get camera feeds
+	{
+		if (argc != 3) {
+			printf("Invalide usage: Method %s in process %s", first[9], argv[0]);
+		}
+		else {
+
+			imgs_directory = argv[2];
+			CvCapture* captureL = 0;
+			captureL = cvCreateCameraCapture(0);
+			if (!captureL) {
+				return -1;
+			}
+
+			CvCapture* captureR = 0;
+			captureR = cvCreateCameraCapture(1);
+			if (!captureR) {
+				return -1;
+			}
+
+			IplImage *frameL = cvQueryFrame(captureL);//Init the video read
+			IplImage *frameR = cvQueryFrame(captureR);//Init the video read
+			double fps = cvGetCaptureProperty(
+				captureL,
+				CV_CAP_PROP_FPS
+			);
+
+			CvSize size = cvSize(
+				(int)cvGetCaptureProperty(captureL, CV_CAP_PROP_FRAME_WIDTH),
+				(int)cvGetCaptureProperty(captureL, CV_CAP_PROP_FRAME_HEIGHT)
+			);
+
+			CvVideoWriter *writerL = cvCreateVideoWriter(imgs_directory, CV_FOURCC('I', 'P', 'D', 'V'), fps, size); // AVI codec
+			CvVideoWriter *writerR = cvCreateVideoWriter(imgs_directory, CV_FOURCC('I', 'P', 'D', 'V'), fps, size);
+
+			while ((frameL = cvQueryFrame(captureL)) != NULL && (frameR = cvQueryFrame(captureR))) {
+				cvWriteFrame(writerL, frameL);
+				cvWriteFrame(writerR, frameR);
+
+				if (cvWaitKey(-1) == 27) {
+					cvReleaseVideoWriter(&writerL);
+					cvReleaseVideoWriter(&writerR);
+					cvReleaseCapture(&captureL);
+					cvReleaseCapture(&captureR);
+					break;
+				}
+
+			}
+
+		}
 	}
 	default:
 		break;
