@@ -374,7 +374,7 @@ void readCalibration(VideoCapture capLeft, VideoCapture capRight, int& num_image
 void setup_calibration(int board_width, int board_height, int num_imgs,
 	float square_size, char* imgs_directory, char* imgs_filename, char* extension,
 	Mat &img, Mat& gray, vector<Point2f> &corners, vector<vector<Point2f>> &image_points,
-	vector<vector<Point3d>> &object_points) {
+	vector<vector<Point3f>> &object_points) {
 
 	printf("Getting the board size\n");
 	Size board_size = Size(board_width, board_height);
@@ -402,7 +402,7 @@ void setup_calibration(int board_width, int board_height, int num_imgs,
 			drawChessboardCorners(gray, board_size, corners, found);
 		}
 
-		vector< Point3d > obj;
+		vector< Point3f > obj;
 		for (int i = 0; i < board_height; i++)
 			for (int j = 0; j < board_width; j++)
 				obj.push_back(Point3f((float)j * square_size, (float)i * square_size, 0));
@@ -441,7 +441,7 @@ double computeReprojectionErrors(const vector< vector< Point3d > >& objectPoints
 void intrinsicCalib(int board_width, int board_height, int num_imgs, float square_size,
 	char* imgs_directory, char* imgs_filename, char* out_file, char* extension, Mat img,
 	Mat gray, vector<Point2f> corners, vector<vector<Point2f>> image_points,
-	vector<vector<Point3d>> object_points, char* stereo_calibration_filename) {
+	vector<vector<Point3f>> object_points, char* stereo_calibration_filename) {
 
 	printf("In the intrinsic function\n");
 
@@ -514,8 +514,8 @@ void fisheyeIntrinsicCalib(int board_width, int board_height, int num_imgs, floa
 void load_image_points(int board_width, int board_height, int num_imgs, float square_size,
 	char* leftimg_dir, char* rightimg_dir, Mat img1, Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
 	vector< vector< Point2f > > imagePoints1, vector< vector< Point2f > > imagePoints2,
-	vector< vector< Point3d > > &object_points, vector< vector< Point2d > > &left_img_points,
-	vector< vector< Point2d > > &right_img_points) {
+	vector< vector< Point3f > > &object_points, vector< vector< Point2f > > &left_img_points,
+	vector< vector< Point2f > > &right_img_points) {
 
 	Size board_size = Size(board_width, board_height);
 	int board_n = board_width * board_height;
@@ -551,7 +551,7 @@ void load_image_points(int board_width, int board_height, int num_imgs, float sq
 			cv::drawChessboardCorners(gray2, board_size, corners2, found2);
 		}
 
-		vector< Point3d > obj;
+		vector< Point3f > obj;
 		for (int i = 0; i < board_height; i++)
 			for (int j = 0; j < board_width; j++)
 				obj.push_back(Point3d(double((float)j * square_size), double((float)i * square_size), 0));
@@ -564,10 +564,10 @@ void load_image_points(int board_width, int board_height, int num_imgs, float sq
 		}
 	}
 	for (int i = 0; i < imagePoints1.size(); i++) {
-		vector< Point2d > v1, v2;
+		vector< Point2f > v1, v2;
 		for (int j = 0; j < imagePoints1[i].size(); j++) {
-			v1.push_back(Point2d((double)imagePoints1[i][j].x, (double)imagePoints1[i][j].y));
-			v2.push_back(Point2d((double)imagePoints2[i][j].x, (double)imagePoints2[i][j].y));
+			v1.push_back(Point2f((double)imagePoints1[i][j].x, (double)imagePoints1[i][j].y));
+			v2.push_back(Point2f((double)imagePoints2[i][j].x, (double)imagePoints2[i][j].y));
 		}
 		left_img_points.push_back(v1);
 		right_img_points.push_back(v2);
@@ -584,10 +584,9 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	FileStorage fsl(leftcalib_file, FileStorage::READ);
 	FileStorage fsr(rightcalib_file, FileStorage::READ);
 
-	/*load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"],
-	leftimg_dir, rightimg_dir, leftimg_filename, rightimg_filename, img1, img2,
-	gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
-	left_img_points, right_img_points, stereo_calibration_filename);*/
+	load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"], leftimg_dir, rightimg_dir,
+		img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_points,
+		left_img_points, right_img_points);
 
 	printf("Starting Calibration\n");
 	Mat K1, K2, R, F, E;
@@ -628,68 +627,6 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	fs1 << "Q" << Q;
 
 	printf("Done Rectification\n");
-}
-
-void fisheyeExtrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* leftimg_dir, char* rightimg_dir, char* out_file, int num_imgs, Mat img1, Mat img2, Mat gray1, Mat gray2, vector<Point2f> corners1, vector<Point2f> corners2,
-	vector< vector< Point2f > > imagePoints1, vector< vector< Point2f > > imagePoints2,
-	vector< vector< Point3d > > object_pointsE, vector< vector< Point2d > > left_img_points,
-	vector< vector< Point2d > > right_img_points) {
-
-	// TESTING THE GITHUB CODE ----------------------------------------------------------------------------
-	FileStorage fsl(leftcalib_file, FileStorage::READ);
-	FileStorage fsr(rightcalib_file, FileStorage::READ);
-	load_image_points(fsl["board_width"], fsl["board_height"], num_imgs, fsl["square_size"], leftimg_dir, rightimg_dir,
-		img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_pointsE, left_img_points, right_img_points);
-
-
-	printf("Starting Calibration\n");
-	cv::Matx33d K1, K2, R;
-	cv::Vec3d T;
-	cv::Vec4d D1, D2;
-
-	// Added: get camera matrices from left and right cameras to initialize the following parameters
-	fsl["K"] >> Mat(K1);
-	fsr["K"] >> Mat(K2);
-	//fsl["D1"] >> D1;
-	//fsr["D2"] >> D2;
-
-	int flag = 0;
-	flag |= cv::fisheye::CALIB_USE_INTRINSIC_GUESS; // K1, K2 contains valid initial values of fx, fy, cx, cy that are optimized further. 
-													//flag |= cv::fisheye::CALIB_FIX_INTRINSIC; // Fix K1, K2? and D1, D2? so that only R, T matrices are estimated.
-	flag |= cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC;
-	//flag |= cv::fisheye::CALIB_CHECK_COND; // Assertion Failure occurs when values are -nan not valid
-	flag |= cv::fisheye::CALIB_FIX_SKEW;
-	flag |= cv::fisheye::CALIB_FIX_K1;
-	flag |= cv::fisheye::CALIB_FIX_K2;
-	flag |= cv::fisheye::CALIB_FIX_K3;
-	flag |= cv::fisheye::CALIB_FIX_K4;
-	cv::fisheye::stereoCalibrate(object_pointsE, left_img_points, right_img_points,
-		K1, D1, K2, D2, img1.size(), R, T, flag,
-		cv::TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 100, DBL_EPSILON));//cv::TermCriteria(3, 12, 0));
-
-	cv::FileStorage fs1(out_file, cv::FileStorage::WRITE);
-	fs1 << "K1" << Mat(K1);
-	fs1 << "K2" << Mat(K2);
-	fs1 << "D1" << D1;
-	fs1 << "D2" << D2;
-	fs1 << "R" << Mat(R);
-	fs1 << "T" << T;
-	printf("Done Calibration\n");
-
-	printf("Starting Rectification\n");
-
-	cv::Mat R1, R2, P1, P2, Q;
-	cv::fisheye::stereoRectify(K1, D1, K2, D2, img1.size(), R, T, R1, R2, P1, P2,
-		Q, CV_CALIB_ZERO_DISPARITY, img1.size(), 0.0, 1.1);
-
-	fs1 << "R1" << R1;
-	fs1 << "R2" << R2;
-	fs1 << "P1" << P1;
-	fs1 << "P2" << P2;
-	fs1 << "Q" << Q;
-
-	printf("Done Rectification\n");
-	//return 0;
 }
 
 void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
@@ -1253,11 +1190,23 @@ int main(int argc, char *argv[]) {
 		}
 		else {
 			/*$ .\Main.exe 7 <Video Path 1 --- D:\EC464\VDOs\April_Test\chessboard1.avi>
-			<Video Path 2 --- D:\EC464\VDOs\April_Test\chessboard2.avi>  <left dir for images -- D:\EC464\VDOs\April_Test\Calibration\left>
+			<Video Path 2 --- D:\EC464\VDOs\April_Test\chessboard2.avi>
+			<left dir for images -- D:\EC464\VDOs\April_Test\Calibration\left>
 			<right dir for images --- D:\EC464\VDOs\April_Test\Calibration\right>
 			<output for calibration left camera -- D:\EC464\VDOs\April_Test\Calibration\cam_left.yml>
 			<output for calibration right camera -- D:\EC464\VDOs\April_Test\Calibration\cam_right.yml>
-			<output for calibration two camera -- D:\EC464\VDOs\April_Test\Calibration\cam.yml>*/
+			<output for calibration two camera -- D:\EC464\VDOs\April_Test\Calibration\cam.yml>
+
+			.\CannyStill.exe
+			7
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\out1.avi
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\out2.avi
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\cb2
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\cb2
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\cam_left.yml
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\cam_right.yml
+			C:\Users\Christina\source\repos\SeniorProject\CannyStill\cam.yml
+			*/
 
 			// left calibration video
 			left_initial_video = argv[2];
@@ -1276,21 +1225,30 @@ int main(int argc, char *argv[]) {
 			//calib_filepath = argv[9];
 			int x = 0; // num of images
 
-			vector< vector< Point3d > > object_pointsI;
-			vector< vector< Point3d > > object_pointsE;
+					   /*vector< vector< Point3d > > object_pointsI;
+					   vector< vector< Point3d > > object_pointsE;*/
+
+			vector< vector< Point3f > > object_pointsI;
+			vector< vector< Point3f > > object_pointsE;
 
 			// intrinsic one camera calibration
-			vector< vector< Point2f > > image_points;
+			/*vector< vector< Point2f > > image_points;
 			vector< vector< Point2d > > img_points;
+			vector< Point2f > corners;*/
+			vector< vector< Point2f > > image_points;
+			vector< vector< Point2f > > img_points;
 			vector< Point2f > corners;
 
 			Mat img, gray;
 			Size im_size;
 
 			// extrinsic two-camera calibration
+			/*vector< vector< Point2f > > imagePoints1, imagePoints2;
+			vector< Point2f > corners1, corners2;
+			vector< vector< Point2d > > left_img_points, right_img_points;*/
 			vector< vector< Point2f > > imagePoints1, imagePoints2;
 			vector< Point2f > corners1, corners2;
-			vector< vector< Point2d > > left_img_points, right_img_points;
+			vector< vector< Point2f > > left_img_points, right_img_points;
 
 			Mat img1, img2, gray1, gray2;
 
@@ -1300,14 +1258,28 @@ int main(int argc, char *argv[]) {
 			// get test images to calibrate
 			readCalibration(capLeft, capRight, x, 319, 240, left_image_dir, right_image_dir, "jpg");
 
-			fisheyeIntrinsicCalib(7, 7, x, 0.02006375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
-				corners, image_points, object_pointsI);
+
+
+			intrinsicCalib(7, 7, x, 0.02006375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
+				corners, image_points, object_pointsI, stereo_calibration_filename);
+
+			intrinsicCalib(7, 7, x, 0.02006375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
+				corners, image_points, object_pointsI, stereo_calibration_filename);
+
+
+			extrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir,
+				left_calib_filename, right_calib_filename, stereo_calibration_filename, x, img1,
+				img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_pointsE,
+				left_img_points, right_img_points, stereo_calibration_filename);
+
+			/*fisheyeIntrinsicCalib(7, 7, x, 0.02006375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
+			corners, image_points, object_pointsI);
 
 			fisheyeIntrinsicCalib(7, 7, x, 0.02006375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
-				corners, image_points, object_pointsI);
+			corners, image_points, object_pointsI);
 
 			fisheyeExtrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_pointsE,
-				left_img_points, right_img_points);
+			left_img_points, right_img_points);*/
 		}
 		break;
 	}
