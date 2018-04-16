@@ -576,7 +576,7 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	cout << "Read intrinsics" << endl;
 	//cout << img1.size() << endl;
 	double rms = stereoCalibrate(object_pointsE, left_img_points, right_img_points, K1, D1, K2, D2, img1.size(), R, T, E, F, flag,
-		cvTermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 30, 1e-6));
+		cvTermCriteria(CV_TERMCRIT_ITER + CV_TERMCRIT_EPS, 100, 1e-5));
 	//options for term criteria --  for the iterative optimization algorithm
 	// cvTermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 1e-6)
 	// cvTermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 100, 1e-6));
@@ -618,7 +618,7 @@ void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 	Mat imgLeft, img_resLeft, imgRight, img_resRight;
 
 	while ((char)waitKey(1) != 'q') { // press "q" key to escape
-		waitKey(3);
+									  //waitKey();
 		capLeft >> imgLeft;
 		capRight >> imgRight;
 
@@ -636,7 +636,6 @@ void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 
 		imshow("Left Camera", imgLeft);
 		imshow("Right Camera", imgRight);
-
 
 		if ((char)waitKey(1) == 's') { // if press "s" key, will save screenshots
 			num_images++;
@@ -682,6 +681,7 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 	fs["Q"] >> Q;
 	fs.release();
 
+
 	printf("Calculating rectification transform map and remapping pixel positions\n");
 
 	// rectification transform maps
@@ -700,6 +700,12 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 	// 3D filename
 	char out_file[100];
 
+	// depth excel sheet data
+	ofstream outdata;
+	char outdata_file[100];
+
+
+
 	for (int k = 1; k <= num_imgs; k++) {
 		// --------------------------------------------------------------------------------------
 		/* -- STEREO RECTIFICATION: Computes the UNDISTORTION and RECTIFICATION TRANSFORM MAP -- */
@@ -714,15 +720,16 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		img2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
 		cvtColor(img2, img2, CV_BGR2GRAY);
 
+
 		// rectified left and right image variables
-		Mat imgU1; //  (img1.size(), CV_8UC1);
+		Mat imgU1; // (img1.size(), CV_8UC1);
 		Mat imgU2; // (img2.size(), CV_8UC1);
 
 				   // Generates a rectification transform map
-		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32F, lmapx, lmapy); // left
-		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32F, rmapx, rmapy); // right
+		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // left
+		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy); // right
 
-																					// remapping/ relocation pixel positions in calibrated images to the rectification transform maps
+																					  // remapping/ relocation pixel positions in calibrated images to the rectification transform maps
 		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
 		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
 
@@ -792,15 +799,28 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		reprojectImageTo3D(disp16, depth, Q, false, CV_32F);
 		//reprojectImageTo3D(disparity, depth, Q, false, CV_32F);
 
+		cout << "depth map size " << depth.channels() << endl;
 		// every pixel will have 3D coordinates, can be obtained:
-		/*for (int x = 0; x < depth.cols; x++) {
-		//for (int y = 0; y < depth.rows; y++) {
-		Point3f p = depth.at<Point3f>(340, x); // depth is p.z
-		if (p.z >= 10000) continue;  // Filter errors
-		printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file
-		//}
-		}*/
+		sprintf(outdata_file, "%s\\depth%d.csv", Output, k);
+		outdata.open(outdata_file);
+		outdata << "Depth Map Frame " << k << endl;
+		outdata << "X, Y, Z, Depth" << endl;
+		for (int x = 0; x < depth.cols; x++) {
+			for (int y = 0; y < depth.rows; y++) {
+				Vec3f coordinates = depth.at<Vec3f>(y, x);
+				float d = depth.at<Vec3f>(y, x)[2];
 
+				Point3f p = depth.at<Point3f>(y, x); // depth is p.z
+				if (p.z >= 10000) { // or print to a file
+					outdata << "error value" << "," << "error value" << "," << "error value" << "error value" << endl; // Filter errors
+				}
+				else {
+					outdata << p.x << "," << p.y << "," << p.z << "," << d << endl;
+				}
+				// printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file	 
+			}
+		}
+		outdata.close();
 		// save depth
 		sprintf(out_file, "%s\\depth3D_%d.%s", Output, k, extension);
 		printf("Saving to %s \n", out_file);
@@ -1050,10 +1070,10 @@ int main(int argc, char *argv[]) {
 			// get test images to calibrate
 			readCalibration(capLeft, capRight, x, 319, 240, left_image_dir, right_image_dir, "jpg");
 
-			intrinsicCalib(7, 7, x, 0.02006375, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
+			intrinsicCalib(7, 9, x, 0.024, left_image_dir, "left", left_calib_filename, "jpg", img, gray,
 				corners, image_points, object_pointsI);
 
-			intrinsicCalib(7, 7, x, 0.02006375, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
+			intrinsicCalib(7, 9, x, 0.024, right_image_dir, "right", right_calib_filename, "jpg", img, gray,
 				corners, image_points, object_pointsI);
 
 			extrinsicCalibration(left_calib_filename, right_calib_filename, left_image_dir, right_image_dir, stereo_calibration_filename, x, img1, img2, gray1, gray2, corners1, corners2, imagePoints1, imagePoints2, object_pointsE,
