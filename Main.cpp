@@ -611,6 +611,40 @@ void extrinsicCalibration(char* leftcalib_file, char* rightcalib_file, char* lef
 	printf("Done Rectification\n");
 }
 
+// Reproject image to 3D
+void customReproject(const cv::Mat& disparity, const cv::Mat& Q, cv::Mat& out3D)
+{
+	CV_Assert(disparity.type() == CV_32F && !disparity.empty());
+	CV_Assert(Q.type() == CV_32F && Q.cols == 4 && Q.rows == 4);
+
+	// 3-channel matrix for containing the reprojected 3D world coordinates
+	out3D = cv::Mat::zeros(disparity.size(), CV_32FC3);
+
+	// Getting the interesting parameters from Q, everything else is zero or one
+	float Q03 = Q.at<float>(0, 3);
+	float Q13 = Q.at<float>(1, 3);
+	float Q23 = Q.at<float>(2, 3);
+	float Q32 = Q.at<float>(3, 2);
+	float Q33 = Q.at<float>(3, 3);
+
+	// Transforming a single-channel disparity map to a 3-channel image representing a 3D surface
+	for (int i = 0; i < disparity.rows; i++)
+	{
+		const float* disp_ptr = disparity.ptr<float>(i);
+		cv::Vec3f* out3D_ptr = out3D.ptr<cv::Vec3f>(i);
+
+		for (int j = 0; j < disparity.cols; j++)
+		{
+			const float pw = 1.0f / (disp_ptr[j] * Q32 + Q33);
+
+			cv::Vec3f& point = out3D_ptr[j];
+			point[0] = (static_cast<float>(j) + Q03) * pw;
+			point[1] = (static_cast<float>(i) + Q13) * pw;
+			point[2] = Q23 * pw;
+		}
+	}
+}
+
 
 void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 	int img_width, int img_height, char* imgsLeft_directory, char* imgsRight_directory, char* extension) {
@@ -681,7 +715,6 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 	fs["Q"] >> Q;
 	fs.release();
 
-
 	printf("Calculating rectification transform map and remapping pixel positions\n");
 
 	// rectification transform maps
@@ -699,6 +732,7 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 
 	// 3D filename
 	char out_file[100];
+	char out_file2[100];
 
 	// depth excel sheet data
 	ofstream outdata;
@@ -752,13 +786,12 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		sbm->setMinDisparity(minDisparity);
 		//sbm->setROI1();
 		//sbm->setPreFilterSize(5); // preFilterCap, preFilterSize, preFilterType - used in filtering the input images before disparity computation. These may improve noise rejection in input images.
-		//sbm->setPreFilterCap(1);
-		//sbm->setMinDisparity(-16);
-		//sbm->setTextureThreshold(5); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
-		//sbm->setUniquenessRatio(0);
-		//sbm->setSpeckleWindowSize(0); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
-		//sbm->setSpeckleRange(20);
-		//sbm->setDisp12MaxDiff(64);*/
+		sbm->setPreFilterCap(10);
+		sbm->setTextureThreshold(15); // textureThreshold, uniquenessRatio - used in filtering the disparity map before returning. May reduce noise.
+		sbm->setUniquenessRatio(10);
+		sbm->setSpeckleWindowSize(100); //disp12MaxDiff, speckleRange, speckleWindowSize - used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
+		sbm->setSpeckleRange(32);
+		sbm->setDisp12MaxDiff(1);
 
 		printf("Computing disparity for rectified image pair %d\n", k);
 		/*Compute the disparity for 2 rectified 8-bit single-channel frames. The disparity will be 16-bit signed
@@ -770,7 +803,7 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 				  // Check its extreme values
 		double minVal; double maxVal;
 		minMaxLoc(disparity, &minVal, &maxVal);
-		printf("Min disp: %f Max value: %f \n", minVal, maxVal);
+		printf("Min disparity found: %f Max disparity found: %f \n", minVal, maxVal);
 		// Normalize it as a CV_8UC1 image
 		disparity.convertTo(disp8, CV_8UC1, 255 / (maxVal - minVal));
 
@@ -791,31 +824,50 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		// --------------------------------------------------------------------------------------
 		printf("Computing depth from disparity map %d\n", k);
 		// 3D image from disparity
-		Mat depth;//  (disparity.size(), CV_32F);
+		Mat depth, customDepth;//  (disparity.size(), CV_32F);
 		Mat disp16;
 		disparity.convertTo(disp16, CV_32F, 1.0 / 16.0);
+		//disparity.convertTo(disparity, CV_32F, 1.0 / 16.0);
 
 		// Compute point cloud - reprojection of disparity map to 3D
-		reprojectImageTo3D(disp16, depth, Q, false, CV_32F);
-		//reprojectImageTo3D(disparity, depth, Q, false, CV_32F);
+		Q.convertTo(Q, CV_32F);
+		reprojectImageTo3D(disp16, depth, Q, true, CV_32F); // Q = Output  4 \times 4 disparity-to-depth mapping matrix 
+															//reprojectImageTo3D(disparity, depth, Q, true, CV_32F);
+															//Q.convertTo(Q, CV_32F);
+															//Mat_<float> vec(4, 1);
+															// cout << "Channel: " << disp16.channels() << " Size: " << disp16.size() << endl;
+															// cout << "Channel: " << depth.channels() << " Size: " << depth.size() << endl;
 
-		cout << "depth map size " << depth.channels() << endl;
-		// every pixel will have 3D coordinates, can be obtained:
+
+															//customReproject(disp16, Q, customDepth);
+
+															//cout << "depth map size " << depth.channels() << endl;
+															// every pixel will have 3D coordinates, can be obtained:
 		sprintf(outdata_file, "%s\\depth%d.csv", Output, k);
 		outdata.open(outdata_file);
 		outdata << "Depth Map Frame " << k << endl;
-		outdata << "X, Y, Z, Depth" << endl;
+		outdata << "Pixel X, Pixel Y, Real X, Real Y, Real Z" << endl;
 		for (int x = 0; x < depth.cols; x++) {
 			for (int y = 0; y < depth.rows; y++) {
-				Vec3f coordinates = depth.at<Vec3f>(y, x);
-				float d = depth.at<Vec3f>(y, x)[2];
-
+				//vec(0) = x;
+				//vec(1) = y;
+				//vec(2) = disp16.at<float>(y, x);
+				//vec(3) = 1;
+				//vec = Q * vec;
+				//vec /= vec(3);
 				Point3f p = depth.at<Point3f>(y, x); // depth is p.z
-				if (p.z >= 10000) { // or print to a file
-					outdata << "error value" << "," << "error value" << "," << "error value" << "error value" << endl; // Filter errors
-				}
-				else {
-					outdata << p.x << "," << p.y << "," << p.z << "," << d << endl;
+													 //Point2f p2 = disp16.at<Point1f>
+													 //Point3f p2 = customDepth.at<Point3f>(y, x);
+													 //if (abs(p.x) > 10 || abs(p.y) > 10 || abs(p.z) > 10) { // Discard points that are too far from the camera, and thus are highly unreliable
+													 //if (abs(vec(0))>10 || abs(vec(1))>10 || abs(vec(2))>10) {
+													 /*if (p.z >= 10000) {
+													 outdata << "too far" << "," << "too far" << "," << "too far"  << endl;
+													 }*/
+													 //else {
+				if (p.z < 10000) {
+					outdata << x << "," << y << "," << p.x << "," << p.y << "," << p.z << endl;
+					// outdata << p.x << "," << p.y << "," << p.z << "," << endl;
+					//outdata << vec(0) << "," << vec(1) << "," << vec(2) << "," << endl;
 				}
 				// printf("Pixel coordinates: %f %f , Depth: %f \n", p.x, p.y, p.z);  // or print to a file	 
 			}
@@ -823,8 +875,10 @@ void StereoVision(int& num_imgs, string calib_file, char* left_directory, char* 
 		outdata.close();
 		// save depth
 		sprintf(out_file, "%s\\depth3D_%d.%s", Output, k, extension);
+		//sprintf(out_file2, "%s\\customDepth3D_%d.%s", Output, k, extension);
 		printf("Saving to %s \n", out_file);
 		imwrite(out_file, depth);
+		//imwrite(out_file2, customDepth);
 		// --------------------------------------------------------------------------------------
 
 		/*//VISUALIZE POINT CLOUD - VIZ - need to link
@@ -1012,7 +1066,6 @@ int main(int argc, char *argv[]) {
 
 			// Stereo rectification, disparity map generation, point cloud generatioin
 			StereoVision(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg", imgs_directory, numOfDisparities, blockSize, minDisparity);
-			//fisheyeStereoVision(num_imgs, calib_file, left_image_dir, "left", right_image_dir, "right", "jpg", imgs_directory, numOfDisparities, blockSize, minDisparity);
 		}
 		break;
 	}
