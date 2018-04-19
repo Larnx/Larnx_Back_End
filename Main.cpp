@@ -690,6 +690,8 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 	char out_file2[100];
 	std::ofstream outdata;
 	char outdata_file[100];
+	/* For rectifying with color images*/
+	vector<Mat> imgC1(3), imgC2(3);
 
 	for (int k = 1; k <= num_imgs; k++) {
 		// --------------------------------------------------------------------------------------
@@ -698,11 +700,15 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 		sprintf(img_file1, "%s\\%s%d.%s", left_directory, left_filename, k, extension);
 		printf("Rectifying %s \n", img_file1);
 		img1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
+		/*Split channel to rectify each color channel*/
+		split(img1, imgC1); 
 		cvtColor(img1, img1, CV_BGR2GRAY); // make single channel;
 
 		sprintf(img_file2, "%s\\%s%d.%s", right_directory, right_filename, k, extension);
 		printf("Rectifying %s \n", img_file2);
 		img2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
+		/*Split channel to rectify each color channel*/
+		split(img2, imgC2);
 		cvtColor(img2, img2, CV_BGR2GRAY);
 
 
@@ -717,6 +723,21 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 																					  // remapping/ relocation pixel positions in calibrated images to the rectification transform maps
 		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
 		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
+
+		/* remap each color channel BGR */
+		// left
+		remap(imgC1[0], imgC1[0], lmapx, lmapy, cv::INTER_LINEAR);
+		remap(imgC1[1], imgC1[1], lmapx, lmapy, cv::INTER_LINEAR);
+		remap(imgC1[2], imgC1[2], lmapx, lmapy, cv::INTER_LINEAR);
+		Mat imgRectColor1;
+		merge(imgC1, imgRectColor1); // merge
+		// right
+		remap(imgC2[0], imgC2[0], lmapx, lmapy, cv::INTER_LINEAR);
+		remap(imgC2[1], imgC2[1], lmapx, lmapy, cv::INTER_LINEAR);
+		remap(imgC2[2], imgC2[2], lmapx, lmapy, cv::INTER_LINEAR);
+		Mat imgRectColor2;
+		merge(imgC2, imgRectColor2); // merge
+		/* use imgRectColor1 and 2 for contour tracking */
 
 		sprintf(img_outfile1, "%s\\left_rect_%d.%s", left_directory, k, extension);
 		sprintf(img_outfile2, "%s\\right_rect_%d.%s", right_directory, k, extension);
