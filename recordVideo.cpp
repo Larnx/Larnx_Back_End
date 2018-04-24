@@ -48,8 +48,10 @@ void readRectify(VideoCapture capLeft, VideoCapture capRight, int& num_images,
 
 void splitImage(Mat frame, Mat& leftFrame, Mat& rightFrame) {
 	int img_size = frame.size().width;
-	leftFrame = frame(cv::Range(0, frame.size().height), cv::Range(0, (img_size / 2) - 1));
-	rightFrame = frame(cv::Range(0, frame.size().height), cv::Range((img_size / 2) + 1, img_size));
+	/*leftFrame = frame(cv::Range(0, frame.size().height), cv::Range(0, (img_size / 2) - 1));
+	rightFrame = frame(cv::Range(0, frame.size().height), cv::Range((img_size / 2) + 1, img_size));*/
+	leftFrame = frame(cv::Range(0, 2 * (frame.size().height / 3)), cv::Range(0, (img_size / 2) - 1));
+	rightFrame = frame(cv::Range((frame.size().height / 3), frame.size().height), cv::Range((img_size / 2) + 1, img_size));
 }
 
 int main() {
@@ -70,10 +72,14 @@ int main() {
 	cin >> right_vid;
 	cout << "\n";
 
-	int frame_width1 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
+	/*int frame_width1 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
 	int frame_height1 = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
 	int frame_width2 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
-	int frame_height2 = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
+	int frame_height2 = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);*/
+	int frame_width1 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
+	int frame_height1 = 2 * (vcap.get(CV_CAP_PROP_FRAME_HEIGHT) / 3);
+	int frame_width2 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
+	int frame_height2 = 2 * (vcap.get(CV_CAP_PROP_FRAME_HEIGHT) / 3);
 	VideoWriter video1(left_vid, CV_FOURCC('M', 'J', 'P', 'G'), 10, Size(frame_width1, frame_height1), true);
 	VideoWriter video2(right_vid, CV_FOURCC('M', 'J', 'P', 'G'), 10, Size(frame_width2, frame_height2), true);
 
@@ -82,6 +88,7 @@ int main() {
 
 		Mat frame1, leftFrame, rightFrame;
 		vcap >> frame1;
+		imshow(frame1);
 		splitImage(frame1, leftFrame, rightFrame);
 		imshow("Frame1", leftFrame);
 		imshow("Frame2", rightFrame);
@@ -93,9 +100,9 @@ int main() {
 	}
 	VideoCapture cap1(left_vid);
 	VideoCapture cap2(right_vid);
-	int num_imgs = 0;
+	//int num_imgs = 0;
 
-	readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), image_folder, image_folder, "jpg");
+	//readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), image_folder, image_folder, "jpg");
 
 
 
