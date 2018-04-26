@@ -1074,7 +1074,16 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 	}
 }
 
+void removeShadow(Mat img) {
 
+	cvtColor(img, img, CV_BGR2YUV);
+	std::vector<cv::Mat> channels;
+	split(img, channels);
+	equalizeHist(channels[0], channels[0]);
+	merge(channels, img);
+	cvtColor(img, img, CV_YUV2BGR);
+	//cv::imshow("remove shadow", img);
+}
 int main(int argc, char *argv[])
 {
 	enum METHOD {
