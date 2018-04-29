@@ -1,0 +1,50 @@
+name: rectangle
+numDisparities: 32
+minDisparity: 0
+blockSize: 21
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 150
+SpeckleRange: 5
+Disp12MaxDiff: 1
+
+name: bottle
+numDisparities: 96
+minDisparity: 0
+blockSize: 25
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 1000
+SpeckleRange: 1
+Disp12MaxDiff: 1
+
+name: cube
+numDisparities: 80
+minDisparity: 0
+blockSize: 23
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 500
+SpeckleRange: 300
+Disp12MaxDiff: 1
+
+name: M&M
+numDisparities: 144 
+minDisparity: 0
+blockSize: 35
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 700
+SpeckleRange: 100
+Disp12MaxDiff: 1
+
+
+	
