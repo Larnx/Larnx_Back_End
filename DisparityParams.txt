@@ -1,3 +1,39 @@
+name: cube on wall fixed
+numDisparities: 160 
+minDisparity: 0
+blockSize: 37
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 400
+SpeckleRange: 10
+Disp12MaxDiff: 1
+
+name: M&M on wall
+numDisparities: 48 
+minDisparity: 0
+blockSize: 9
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 1000
+SpeckleRange: 5
+Disp12MaxDiff: 1
+
+name: M&M in trash
+numDisparities: 64 
+minDisparity: 0
+blockSize: 31
+PreFilterSize: 31
+PreFilterCap: 63
+TextureThreshold: 20
+UniquenessRatio: 5
+SpeckleWindowSize: 1000
+SpeckleRange: 5
+Disp12MaxDiff: 1
+
 name: rectangle
 numDisparities: 32
 minDisparity: 0
@@ -33,18 +69,5 @@ UniquenessRatio: 5
 SpeckleWindowSize: 500
 SpeckleRange: 300
 Disp12MaxDiff: 1
-
-name: M&M
-numDisparities: 144 
-minDisparity: 0
-blockSize: 35
-PreFilterSize: 31
-PreFilterCap: 63
-TextureThreshold: 20
-UniquenessRatio: 5
-SpeckleWindowSize: 700
-SpeckleRange: 100
-Disp12MaxDiff: 1
-
 
 	
