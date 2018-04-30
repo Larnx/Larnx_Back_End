@@ -19,7 +19,8 @@ Kestutis Subacius
 #include <stdlib.h>
 #include <thread>
 #include <Windows.h>
-
+#include <queue>
+#include <numeric>
 
 using namespace cv;
 
@@ -29,7 +30,7 @@ void saveFrame(std::string Video_Path, std::string Output_Directory_Path, double
 	VideoCapture cap(Video_Path);
 	std::string FRAME_NAME = File_Name + ".jpg";
 
-	namedWindow("Video Capture", WINDOW_NORMAL);
+	cv::namedWindow("Video Capture", WINDOW_NORMAL);
 
 	int timeStep = 1;
 	int frameCount = 0;
@@ -62,8 +63,8 @@ void ThresholdHSV(std::string Video_Path, std::string Output_Directory_Path, std
 	std::string CSV_NAME = File_Name + ".csv";
 	std::string MP4_NAME = File_Name + ".avi";
 
-	namedWindow("Video Capture", WINDOW_NORMAL);
-	namedWindow("Object Detection", WINDOW_NORMAL);
+	cv::namedWindow("Video Capture", WINDOW_NORMAL);
+	cv::namedWindow("Object Detection", WINDOW_NORMAL);
 
 	/* Current Function: Segments green from video, returns pixel data vs time stamps for UI to plot to console, saves segmented vdo */
 	/* Future Functions: Track green residue with bound boxes, returns ratio pixel data vs time stamp*/
@@ -88,7 +89,7 @@ void ThresholdHSV(std::string Video_Path, std::string Output_Directory_Path, std
 		if (bright.empty())
 			break;
 
-		cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
+		cv::cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
 
 													//-- Detect the object based on HSV Range Values
 													//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
@@ -98,8 +99,8 @@ void ThresholdHSV(std::string Video_Path, std::string Output_Directory_Path, std
 
 		Mat maskHSV, resultHSV(brightHSV.size(), CV_8UC3);
 		//inRange(brightHSV, Scalar(low_h, 1, 254), Scalar(high_h, 1, 254), maskHSV);
-		inRange(brightHSV, minHSV, maxHSV, maskHSV);
-		bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
+		cv::inRange(brightHSV, minHSV, maxHSV, maskHSV);
+		cv::bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
 
 		// get time stamps and sum pixels
 		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << std::endl;
@@ -121,7 +122,7 @@ void ThresholdHSV(std::string Video_Path, std::string Output_Directory_Path, std
 		*/
 
 		// cout << resultHSV << endl;
-		cvtColor(resultHSV, resultHSV, COLOR_HSV2BGR); // convert back to rgb
+		cv::cvtColor(resultHSV, resultHSV, COLOR_HSV2BGR); // convert back to rgb
 
 		writer.write(resultHSV);
 
@@ -141,8 +142,8 @@ void contourTrack(std::string Video_Path, std::string Output_Directory_Path, std
 
 	File_Name = File_Name + ".avi";
 
-	namedWindow("Video Capture", WINDOW_NORMAL);
-	namedWindow("Object Tracking", WINDOW_NORMAL);
+	cv::namedWindow("Video Capture", WINDOW_NORMAL);
+	cv::namedWindow("Object Tracking", WINDOW_NORMAL);
 
 	/* Current Functions: Track green residue with bound contours and boxes*/
 
@@ -163,7 +164,7 @@ void contourTrack(std::string Video_Path, std::string Output_Directory_Path, std
 			break;
 
 		// convert to HSV color space
-		cvtColor(bright, brightHSV, COLOR_BGR2HSV);
+		cv::cvtColor(bright, brightHSV, COLOR_BGR2HSV);
 
 		//-- Detect the object based on HSV Range Values
 		//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
@@ -172,13 +173,13 @@ void contourTrack(std::string Video_Path, std::string Output_Directory_Path, std
 		Scalar maxHSV = Scalar(125, 254, 254);
 
 		Mat maskHSV, resultHSV;
-		inRange(brightHSV, minHSV, maxHSV, maskHSV);
-		bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
+		cv::inRange(brightHSV, minHSV, maxHSV, maskHSV);
+		cv::bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
 
 		// Find contours
 		std::vector<std::vector<Point> > contours;
 		std::vector<Vec4i> hierarchy;
-		findContours(maskHSV, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+		cv::findContours(maskHSV, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 		Mat brightClone = bright.clone();
 
 		// Approximate Contours to resize the contours
@@ -221,8 +222,8 @@ void histogramAnalysis(std::string Video_Path, std::string Frame_Path, std::stri
 
 	std::string MP4_NAME = File_Name + ".avi";
 
-	namedWindow("Video Capture", WINDOW_NORMAL);
-	namedWindow("Histogram Analysis", WINDOW_NORMAL);
+	cv::namedWindow("Video Capture", WINDOW_NORMAL);
+	cv::namedWindow("Histogram Analysis", WINDOW_NORMAL);
 
 	/* Current Function: Display the Hue channel histogram of the HSV colorspace of each video frame*/
 	/* Future Functions: Compare each frame histogram to that of no residue,
@@ -232,11 +233,11 @@ void histogramAnalysis(std::string Video_Path, std::string Frame_Path, std::stri
 	// ideally get frame by having user input frame chosen from save frame function
 	Mat src, hsv;
 	src = imread(Frame_Path);
-	cvtColor(src, hsv, CV_BGR2HSV);
+	cv::cvtColor(src, hsv, CV_BGR2HSV);
 
 	// Separate the image in 3 places ( B, G and R )
 	std::vector<Mat> img_plane;
-	split(src, img_plane);
+	cv::split(src, img_plane);
 
 	// Intialize video frame histogram
 	// Establish the number of bins
@@ -262,10 +263,10 @@ void histogramAnalysis(std::string Video_Path, std::string Frame_Path, std::stri
 		if (bright.empty())
 			break;
 
-		cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
+		cv::cvtColor(bright, brightHSV, COLOR_BGR2HSV); // convert to HSV color space
 
 		std::vector<Mat> hsv_planes;						// Separate the frame in 3 places ( H, S, and V)
-		split(brightHSV, hsv_planes);				// split channels of HSV
+		cv::split(brightHSV, hsv_planes);				// split channels of HSV
 													//split(bright, bgr_planes);
 
 		Mat h_hist, img_hist; //, s_hist, v_hist;
@@ -459,8 +460,8 @@ void load_image_points(int board_width, int board_height, int num_imgs, float sq
 		img1 = imread(left_img, CV_LOAD_IMAGE_COLOR);
 		img2 = imread(right_img, CV_LOAD_IMAGE_COLOR);
 		std::cout << "Image Size: " << img1.size() << std::endl;
-		cvtColor(img1, gray1, CV_BGR2GRAY);
-		cvtColor(img2, gray2, CV_BGR2GRAY);
+		cv::cvtColor(img1, gray1, CV_BGR2GRAY);
+		cv::cvtColor(img2, gray2, CV_BGR2GRAY);
 
 		bool found1 = false, found2 = false;
 
@@ -691,7 +692,7 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 	std::ofstream outdata;
 	char outdata_file[100];
 	/* For rectifying with color images*/
-	vector<Mat> imgC1(3), imgC2(3);
+	std::vector<Mat> imgC1(3), imgC2(3);
 
 	for (int k = 1; k <= num_imgs; k++) {
 		// --------------------------------------------------------------------------------------
@@ -701,15 +702,15 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 		printf("Rectifying %s \n", img_file1);
 		img1 = imread(img_file1, CV_LOAD_IMAGE_COLOR);
 		/*Split channel to rectify each color channel*/
-		split(img1, imgC1); 
-		cvtColor(img1, img1, CV_BGR2GRAY); // make single channel;
+		cv::split(img1, imgC1);
+		cv::cvtColor(img1, img1, CV_BGR2GRAY); // make single channel;
 
 		sprintf(img_file2, "%s\\%s%d.%s", right_directory, right_filename, k, extension);
 		printf("Rectifying %s \n", img_file2);
 		img2 = imread(img_file2, CV_LOAD_IMAGE_COLOR);
 		/*Split channel to rectify each color channel*/
-		split(img2, imgC2);
-		cvtColor(img2, img2, CV_BGR2GRAY);
+		cv::split(img2, imgC2);
+		cv::cvtColor(img2, img2, CV_BGR2GRAY);
 
 
 		// rectified left and right image variables
@@ -717,27 +718,27 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 		Mat imgU2; // (img2.size(), CV_8UC1);
 
 				   // Generates a rectification transform map
-		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // left
-		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy); // right
+		cv::initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // left
+		cv::initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy); // right
 
 																					  // remapping/ relocation pixel positions in calibrated images to the rectification transform maps
-		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
-		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
+		cv::remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
+		cv::remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR); // cv::BORDER_CONSTANT, cv::Scalar());
 
-		/* remap each color channel BGR */
-		// left
-		remap(imgC1[0], imgC1[0], lmapx, lmapy, cv::INTER_LINEAR);
-		remap(imgC1[1], imgC1[1], lmapx, lmapy, cv::INTER_LINEAR);
-		remap(imgC1[2], imgC1[2], lmapx, lmapy, cv::INTER_LINEAR);
+															/* remap each color channel BGR */
+															// left
+		cv::remap(imgC1[0], imgC1[0], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC1[1], imgC1[1], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC1[2], imgC1[2], lmapx, lmapy, cv::INTER_LINEAR);
 		Mat imgRectColor1;
-		merge(imgC1, imgRectColor1); // merge
-		// right
-		remap(imgC2[0], imgC2[0], lmapx, lmapy, cv::INTER_LINEAR);
-		remap(imgC2[1], imgC2[1], lmapx, lmapy, cv::INTER_LINEAR);
-		remap(imgC2[2], imgC2[2], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::merge(imgC1, imgRectColor1); // merge
+									 // right
+		cv::remap(imgC2[0], imgC2[0], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC2[1], imgC2[1], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC2[2], imgC2[2], lmapx, lmapy, cv::INTER_LINEAR);
 		Mat imgRectColor2;
-		merge(imgC2, imgRectColor2); // merge
-		/* use imgRectColor1 and 2 for contour tracking */
+		cv::merge(imgC2, imgRectColor2); // merge
+									 /* use imgRectColor1 and 2 for contour tracking */
 
 		sprintf(img_outfile1, "%s\\left_rect_%d.%s", left_directory, k, extension);
 		sprintf(img_outfile2, "%s\\right_rect_%d.%s", right_directory, k, extension);
@@ -770,14 +771,14 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 				  // normalize(disparity, disp8, 0, 255, CV_MINMAX, CV_8UC1);
 				  // Check its extreme values
 		double minVal; double maxVal;
-		minMaxLoc(disparity, &minVal, &maxVal);
+		cv::minMaxLoc(disparity, &minVal, &maxVal);
 		printf("Min disparity found: %f Max disparity found: %f \n", minVal, maxVal);
 		// Normalize it as a CV_8UC1 image
 		disparity.convertTo(disp8, CV_8UC1, 255 / (maxVal - minVal));
 
 		// To better visualize the result, apply a colormap to the computed disparity
 		Mat cm_disp;
-		applyColorMap(disp8, cm_disp, COLORMAP_JET);
+		cv::applyColorMap(disp8, cm_disp, COLORMAP_JET);
 		//imshow("cm disparity m", cm_disp);
 
 		sprintf(dis_file, "%s\\disparity_%d.%s", Output, k, extension);
@@ -798,7 +799,7 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 
 		// Compute point cloud - reprojection of disparity map to 3D
 		Q.convertTo(Q, CV_32F);
-		reprojectImageTo3D(disp16, depth, Q, true, CV_32F); // Q = Output  4 \times 4 disparity-to-depth mapping matrix 
+		cv::reprojectImageTo3D(disp16, depth, Q, true, CV_32F); // Q = Output  4 \times 4 disparity-to-depth mapping matrix 
 															//reprojectImageTo3D(disparity, depth, Q, true, CV_32F);
 															//Q.convertTo(Q, CV_32F);
 															//Mat_<float> vec(4, 1);
@@ -847,7 +848,94 @@ void StereoVision(int& num_imgs, std::string calib_file, const char* left_direct
 }
 
 
-void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right, std::string Output_Directory_Path, std::string Output_Name, std::string Calibration_File, int numOfDisparities, int blockSize, int minDisparity) {
+float queueAvg(std::queue<float> set) {
+	float avg = 0;
+	int setSize = set.size();
+	for (int i = 0; i < setSize; i++) {
+		avg = avg + set.back();
+		set.pop();
+	}
+	return avg / setSize;
+}
+
+
+float queueMin(std::queue<float> set) {
+	float min, temp;
+	min = set.back();
+	int setSize = set.size();
+	for (int i = 0; i < setSize; i++) {
+		temp = set.back();
+		set.pop();
+		if (temp < min) { min = temp; }
+	}
+	return min;
+}
+
+
+Ptr<StereoBM> readSetupFile(std::string path) {
+
+	std::ifstream inFile;
+	inFile.open(path);
+	Ptr<StereoBM> sbm;
+
+	if (!inFile) { std::cout << "Error reading file at path: " << path << "\n"; }
+	else {
+		std::string content;
+		std::vector<int> parameters;
+
+		inFile >> content; inFile >> content; 
+
+		bool isValue = false;
+		while (inFile >> content) {
+			if (isValue) {
+				parameters.push_back(std::stoi(content));
+			}
+			isValue = !isValue;
+		}
+
+		int numOfDisparities = parameters[0];
+		int minDisparity	 = parameters[1];
+		int blockSize		 = parameters[2];
+		int preFilterSize	 = parameters[3];
+		int preFilterCap	 = parameters[4];
+		int textureThresh	 = parameters[5];
+		int uniqueRatio		 = parameters[6];
+		int speckleSize		 = parameters[7];
+		int speckleRange	 = parameters[8];
+		int maxDiff			 = parameters[9];
+
+		sbm = StereoBM::create(numOfDisparities, blockSize);
+		//sbm->set
+		sbm->setMinDisparity(minDisparity);
+		sbm->setPreFilterSize(preFilterSize);
+		sbm->setPreFilterCap(preFilterCap);
+		sbm->setTextureThreshold(textureThresh);
+		sbm->setUniquenessRatio(uniqueRatio);
+		sbm->setSpeckleWindowSize(speckleSize);
+		sbm->setSpeckleRange(speckleRange);
+		sbm->setDisp12MaxDiff(maxDiff);
+
+		return sbm;
+	};
+	return sbm;
+}
+
+
+Mat smoothMap(Mat original) {
+
+	Mat smoothed;
+
+	int high = 240; 
+	int width = 320; 
+	int blockHigh = 30; 
+	int blockWidth = 40;
+
+}
+
+
+void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right, std::string Output_Directory_Path, std::string Output_Name, std::string Calibration_File, int numOfDisparities, int blockSize, int minDisparity, std::string settingsPath) {
+
+	std::queue<float> slidingWindow;
 
 	Mat bright, brightHSV;
 	Mat originalFrame_Left, originalFrame_Right;
@@ -857,21 +945,112 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 	VideoCapture rightCapture(Video_Path_Right);
 	Output_Name = Output_Name + ".avi";
 
-
 	Size frameSize(leftCapture.get(CV_CAP_PROP_FRAME_WIDTH), leftCapture.get(CV_CAP_PROP_FRAME_HEIGHT));
 	int  fps = leftCapture.get(CAP_PROP_FPS);
 
 	VideoWriter leftWriter;
 	leftWriter.open(Output_Directory_Path + Output_Name, 0, fps, frameSize, 1);
 
+	Mat R1, R2, P1, P2, Q;
+	Mat K1, K2, R;
+	Vec3d T;
+	Mat D1, D2;
+	FileStorage fs(Calibration_File, cv::FileStorage::READ);
+	fs["K1"] >> K1;
+	fs["K2"] >> K2;
+	fs["D1"] >> D1;
+	fs["D2"] >> D2;
+	fs["R"] >> R;
+	fs["T"] >> T;
+	fs["R1"] >> R1;
+	fs["R2"] >> R2;
+	fs["P1"] >> P1;
+	fs["P2"] >> P2;
+	fs["Q"] >> Q;
+	fs.release();
+
+	std::vector<float> volumeMeasurments;
+
+	int frameNumber = 0;
+	bool CONT = true;
 	while ((char)waitKey(1) != 'q')
 	{
-		leftCapture >> originalFrame_Left;
-		rightCapture >> originalFrame_Right;
+		frameNumber++;
+
+		
+
+		if (CONT) {
+			leftCapture >> originalFrame_Left;
+			rightCapture >> originalFrame_Right;
+		}
+
 		if (originalFrame_Left.empty() || originalFrame_Right.empty()) break;
 
-		cvtColor(originalFrame_Left, cvtFrame_Left, COLOR_BGR2HSV);
-		cvtColor(originalFrame_Right, cvtFrame_Right, COLOR_BGR2HSV);
+		Mat lmapx, lmapy, rmapx, rmapy;
+		char img_file1[100], img_file2[100];
+		Mat img1, img2;
+		char img_outfile1[100], img_outfile2[100];
+		char dis_file[100];
+		char out_file[100];
+		char out_file2[100];
+		char outdata_file[100];
+
+		img1 = originalFrame_Left;
+		img2 = originalFrame_Right;
+		std::vector<Mat> imgC1(3), imgC2(3);
+
+		/********************************************************************************************************************************************/
+
+		cv::split(img1, imgC1);
+		cv::cvtColor(img1, img1, CV_BGR2GRAY); // make single channel;
+		cv::split(img2, imgC2);
+		cv::cvtColor(img2, img2, CV_BGR2GRAY);
+
+		Mat imgU1; 
+		Mat imgU2; 
+
+		cv::initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy);
+		cv::remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR);
+
+		cv::remap(imgC1[0], imgC1[0], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC1[1], imgC1[1], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC1[2], imgC1[2], lmapx, lmapy, cv::INTER_LINEAR);
+		Mat imgRectColor1;
+		cv::merge(imgC1, imgRectColor1);
+
+		cv::remap(imgC2[0], imgC2[0], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC2[1], imgC2[1], lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(imgC2[2], imgC2[2], lmapx, lmapy, cv::INTER_LINEAR);
+		Mat imgRectColor2;
+		cv::merge(imgC2, imgRectColor2);
+
+		cv::initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // left
+		cv::initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy); // right
+		cv::remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR);
+		cv::remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR);
+		/********************************************************************************************************************************************/
+
+		/*
+		cvtColor(img1, img1, CV_BGR2GRAY); 
+		cvtColor(img2, img2, CV_BGR2GRAY);
+
+		Mat imgU1; 
+		Mat imgU2; 
+
+		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // left
+		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy); // right
+		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR);
+		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR);
+		*/
+
+		Mat rectLeft  = imgRectColor1;
+		Mat rectRight = imgRectColor2;
+
+		cv::cvtColor(rectLeft, cvtFrame_Left, COLOR_BGR2HSV);
+		cv::cvtColor(rectRight, cvtFrame_Right, COLOR_BGR2HSV);
+
+		//cvtColor(originalFrame_Left, cvtFrame_Left, COLOR_BGR2HSV);
+		//cvtColor(originalFrame_Right, cvtFrame_Right, COLOR_BGR2HSV);
 
 		/* Separate by Hues */
 		int sensitivity = 25;
@@ -879,29 +1058,17 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 		Scalar maxHSV = Scalar(60 + sensitivity, 255, 255);
 		Mat hsvMask_Left, hsvResult_Left;
 		Mat hsvMask_Right, hsvResult_Right;
-		inRange(cvtFrame_Left, minHSV, maxHSV, hsvMask_Left);
-		bitwise_and(cvtFrame_Left, cvtFrame_Left, hsvResult_Left, hsvMask_Left);
-		inRange(cvtFrame_Right, minHSV, maxHSV, hsvMask_Right);
-		bitwise_and(cvtFrame_Right, cvtFrame_Right, hsvResult_Right, hsvMask_Right);
+		cv::inRange(cvtFrame_Left, minHSV, maxHSV, hsvMask_Left);
+		cv::bitwise_and(cvtFrame_Left, cvtFrame_Left, hsvResult_Left, hsvMask_Left);
+		cv::inRange(cvtFrame_Right, minHSV, maxHSV, hsvMask_Right);
+		cv::bitwise_and(cvtFrame_Right, cvtFrame_Right, hsvResult_Right, hsvMask_Right);
 
-		namedWindow("HSV", WINDOW_NORMAL);
+		cv::namedWindow("HSV", WINDOW_NORMAL);
 		cv::imshow("HSV", hsvResult_Left);
-
-		/* Separate by Colors */
-		/*
-		Scalar minRGB = Scalar(36, 0, 0);
-		Scalar maxRGB = Scalar(105, 255, 255);
-		Mat rgbMask_Left,  rgbResult_Left;
-		Mat rgbMask_Right, rgbResult_Right;
-		inRange(originalFrame_Left, minRGB, maxRGB, rgbMask_Left);
-		bitwise_and(originalFrame_Left, originalFrame_Left, rgbResult_Left, rgbMask_Left);
-		inRange(originalFrame_Right, minRGB, maxRGB, rgbMask_Right);
-		bitwise_and(originalFrame_Right, originalFrame_Right, rgbResult_Right, rgbMask_Right);
-		*/
 
 		std::vector<std::vector<Point>> contours;
 		std::vector<Vec4i> hierarchy;
-		findContours(hsvMask_Left, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+		cv::findContours(hsvMask_Left, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 
 		//findContours(cvtFrame_Left, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 		Mat cvtFrameClone_Left = cvtFrame_Left.clone();
@@ -910,7 +1077,7 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 		std::vector<Rect>					boundRect(contours.size());
 		std::vector<Point2f>				center(contours.size());
 		std::vector<float>					radius(contours.size());
-		drawContours(cvtFrameClone_Left, contours, -1, (0, 255, 0), 3);
+		cv::drawContours(cvtFrameClone_Left, contours, -1, (0, 255, 0), 3);
 
 		Rect brect;
 		RotatedRect rotated_bounding_rect;
@@ -935,81 +1102,34 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 			rectangle(cvtFrameClone_Left, brect, Scalar(0, 0, 255), 3); // bounding box border is red
 		}
 
-		namedWindow("Tracked", WINDOW_NORMAL);
+		cv::namedWindow("Tracked", WINDOW_NORMAL);
 		cv::imshow("Tracked", cvtFrameClone_Left);
 
-		Mat R1, R2, P1, P2, Q;
-		Mat K1, K2, R;
-		Vec3d T;
-		Mat D1, D2;
-		FileStorage fs(Calibration_File, cv::FileStorage::READ);
-		fs["K1"] >> K1;
-		fs["K2"] >> K2;
-		fs["D1"] >> D1;
-		fs["D2"] >> D2;
-		fs["R"] >> R;
-		fs["T"] >> T;
-		fs["R1"] >> R1;
-		fs["R2"] >> R2;
-		fs["P1"] >> P1;
-		fs["P2"] >> P2;
-		fs["Q"] >> Q;
-		fs.release();
+		/********************************************************************************************************************************************/
 
-		Mat lmapx, lmapy, rmapx, rmapy;
-		char img_file1[100], img_file2[100];
-		Mat img1, img2;
-		char img_outfile1[100], img_outfile2[100];
-		char dis_file[100];
-		char out_file[100];
-		char out_file2[100];
-		char outdata_file[100];
-
-		img1 = originalFrame_Left;
-		img2 = originalFrame_Right;
-
-		cvtColor(img1, img1, CV_BGR2GRAY); 
-		cvtColor(img2, img2, CV_BGR2GRAY);
-
-		Mat imgU1; 
-		Mat imgU2; 
-
-		initUndistortRectifyMap(K1, D1, R1, P1, img1.size(), CV_32FC1, lmapx, lmapy); // left
-		initUndistortRectifyMap(K2, D2, R2, P2, img2.size(), CV_32FC1, rmapx, rmapy); // right
-		remap(img1, imgU1, lmapx, lmapy, cv::INTER_LINEAR);
-		remap(img2, imgU2, rmapx, rmapy, cv::INTER_LINEAR);
-		
-		Ptr<StereoBM> sbm = StereoBM::create(numOfDisparities, blockSize);
-		sbm->setMinDisparity(minDisparity);
-		sbm->setPreFilterCap(10);
-		sbm->setTextureThreshold(15);	// Used in filtering the disparity map before returning. May reduce noise.
-		sbm->setUniquenessRatio(10);
-		sbm->setSpeckleWindowSize(100); // Used in filtering the disparity map before returning, looking for areas of similar disparity (small areas will be assumed to be noise and marked as having invalid depth information). These reduces noise in disparity map output.
-		sbm->setSpeckleRange(32);
-		sbm->setDisp12MaxDiff(1);
+		Ptr<StereoBM> sbm = readSetupFile(settingsPath);
 
 		Mat disparity;
 		sbm->compute(imgU1, imgU2, disparity);
 		Mat disp8;
 		double minVal; double maxVal;
-		minMaxLoc(disparity, &minVal, &maxVal);
+		cv::minMaxLoc(disparity, &minVal, &maxVal);
 		//printf("Min disparity found: %f Max disparity found: %f \n", minVal, maxVal);
 
 		disparity.convertTo(disp8, CV_8UC1, 255 / (maxVal - minVal));
 
 		Mat cm_disp;
-		applyColorMap(disp8, cm_disp, COLORMAP_JET);
+		cv::applyColorMap(disp8, cm_disp, COLORMAP_JET);
 
 		Mat depth, customDepth, pointCloud;
 		Mat disp16;
 		disparity.convertTo(disp16, CV_32F, 1.0 / 16.0);
 
-		namedWindow("Disparity", WINDOW_NORMAL);
+		cv::namedWindow("Disparity", WINDOW_NORMAL);
 		cv::imshow("Disparity", cm_disp);
 
 		Q.convertTo(Q, CV_32F);
-		reprojectImageTo3D(disp16, depth, Q, true, CV_32F);
-
+		cv::reprojectImageTo3D(disp16, depth, Q, true, CV_32F);
 
 		int leftBound = brect.x;
 		int rightBound = brect.x + brect.width;
@@ -1017,8 +1137,8 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 		int bottomBound = brect.y - brect.height;
 		float Volume = 0;
 		float deltaVolume = 0;
-		int outBox = 0;
-		float outCount = 0;
+		int outsidePixelCount = 0;   int insidePixelCount = 0;
+		float outsidePixelDepth = 0; float insidePixelDepth = 0;
 		
 		float lastX, nextX, lastY, nextY;
 		lastY = depth.at<Point3f>(0, 0).y;
@@ -1028,62 +1148,130 @@ void volumeCalculation(std::string Video_Path_Left, std::string Video_Path_Right
 		float deltaX = nextX - lastX;
 		float deltaY = nextY - lastY;
 
-		for (int y = 0; y < depth.rows; y++) {
-			for (int x = 0; x < depth.cols; x++) {
+		int MAX_KERNEL_LENGTH = 11;
+		Mat bluredDepth;
+		for (int i = 1; i < MAX_KERNEL_LENGTH; i = i + 2)
+		{
+			//medianBlur  (depth, depth, i);
+			GaussianBlur(depth, depth, Size(i, i), 0, 0);
+		}
+		
+
+		int trim = 70;
+		for (int y = 0 + trim; y < depth.rows - trim; y++) {
+			for (int x = 0 + trim; x < depth.cols - trim; x++) {
 				Point3f p = depth.at<Point3f>(y,x);
-				/*
-				Point2f q = depth.at<Point2f>(y, x);
-				if (pointPolygonTest(contours , q, false) >= 0) {
-				deltaVolume = (p.z - avgBackground);
-				deltaVolume = deltaVolume * deltaX * deltaY;
-				Volume = Volume + deltaVolume;
+				//Point2f q = disp16.at<Point2f>(y,x);
+
+				/* Contour Bound */
+				////Point2f point = (Point2f)((float)depth.at<Point3f>(y, x).y, (float)depth.at<Point3f>(y, x).x);
+				//Point2f point = (Point2f)((int)y, (int)x);
+				//if (pointPolygonTest(contours, point, false) >= 0 && p.z < 10000) {
+				//	insidePixelCount++;
+				//	insidePixelDepth = insidePixelDepth + p.z;
+				//}
+				//else if (p.z < 10000) {
+				//	outsidePixelCount++;
+				//	outsidePixelDepth = outsidePixelDepth + p.z;
+				//}
+				
+
+				/* Rectangle Bound */
+				if ((x > leftBound && x < rightBound) && (y > bottomBound && y < topBound) && (p.z < 10000)) {
+					insidePixelCount++;
+					insidePixelDepth = insidePixelDepth + p.z;
 				}
-				*/
-				if ((x > leftBound && x < rightBound) && (y > bottomBound && y < topBound) && (p.z < 10000)) {}
 				else if (p.z < 10000) {
-					outBox++;
-					outCount = outCount + p.z;
+					outsidePixelCount++;
+					outsidePixelDepth = outsidePixelDepth + p.z;
 				}
+				
+
 			}
 		}
-		int avgBackground = outCount / outBox;
-		for (int y = 0; y < depth.rows; y++) {
-			for (int x = 0; x < depth.cols; x++) {
+		float avgBackground, avgInground;
+		avgBackground = outsidePixelDepth / outsidePixelCount;
+		avgInground   = insidePixelDepth  / insidePixelCount;
+		/* 
+		if (outsidePixelDepth != nan && insidePixelDepth != nan) {
+			avgBackground = outsidePixelDepth / outsidePixelCount;
+			avgInground = insidePixelDepth / insidePixelCount;
+		}
+		else {
+			avgBackground = nan;
+			avgInground = nan;
+		}
+		*/
+
+		for (int y = 0 + trim; y < depth.rows - trim; y++) {
+			for (int x = 0 + trim; x < depth.cols - trim; x++) {
 				Point3f p = depth.at<Point3f>(y,x); 
+				//Point2f q = disp16.at<Point2f>(y, x);
 
 				deltaX = depth.at<Point3f>(y, x).x - depth.at<Point3f>(y - 1, x).x;
 				deltaY = depth.at<Point3f>(y, x).y - depth.at<Point3f>(y, x - 1).y;
 
+				/* Contour Bound */
+				////Point2f point = (Point2f)( (float)depth.at<Point3f>(y, x).y, (float)depth.at<Point3f>(y, x).x );
+				//Point2f point = (Point2f)((int)y, (int)x);
+				//if (pointPolygonTest(contours, point, false) >= 0 && p.z < 10000) {
+				//	deltaVolume = p.z;//(avgBackground - p.z);
+				//	deltaVolume = deltaVolume * deltaX * deltaY;
+				//	Volume = Volume + deltaVolume;
+				//}
+				
+
+				/* Rectangle Bound */
 				if ((x > leftBound && x < rightBound) && (y > bottomBound && y < topBound) && (p.z < 10000)) {
-					/*
-					Point2f q = depth.at<Point2f>(y, x);
-					if (pointPolygonTest(contours , q, false) >= 0) {
-						deltaVolume = (p.z - avgBackground);
-						deltaVolume = deltaVolume * deltaX * deltaY;
-						Volume = Volume + deltaVolume;
-					}
-					*/
 					deltaVolume = p.z;//(avgBackground - p.z);
 					deltaVolume = deltaVolume * deltaX * deltaY;
 					Volume = Volume + deltaVolume;
 				}
+				
 			}
 		}
-		Volume = -Volume;
-		std::cout << "Volume in frame: " << Volume << "\n";
+		Volume = std::abs(Volume);
+		
+		slidingWindow.push(Volume);
+		float avgVolumeTumble, avgVolumeSlide;
+		float minVolumeTumble, minVolumeSlide;
+
+		int windowSize = 10;
+		if (frameNumber > windowSize) {
+			slidingWindow.pop();
+			if (frameNumber % windowSize == 0) {
+				avgVolumeTumble = queueAvg(slidingWindow);
+				minVolumeTumble = queueMin(slidingWindow);
+				std::cout << "Tumble avg Volume: " << avgVolumeTumble << "\n";
+				volumeMeasurments.push_back(minVolumeTumble);
+			}
+			avgVolumeSlide = queueAvg(slidingWindow);
+			minVolumeSlide = queueMin(slidingWindow);
+		}
+		//std::cout << "Sliding avg Volume: " << avgVolumeSlide << "\n";
+		//std::cout << "Tumble  avg Volume: " << avgVolumeTumble << "\n";
+		//std::cout << "Sliding min Volume: " << minVolumeSlide << "\n";
+		//std::cout << "Tumble  min Volume: " << minVolumeTumble << "\n";
+		//std::cout << "Depth Outside: " << avgBackground << "\n";
+		//std::cout << "Depth Inside : " << avgInground << "\n";
+		//std::cout << "Volume in frame: " << Volume << "\n";
+
+		char key = waitKey(1);
+		if (key == 'c') {
+			CONT = !CONT; 
+		}
+
 	}
+	float FinalVolume = std::accumulate(volumeMeasurments.begin(), volumeMeasurments.end(), 0) / volumeMeasurments.size();
+	std::cout << "Final Volume Estimation: " << FinalVolume << "\n";
 }
 
-void removeShadow(Mat img) {
-
-	cvtColor(img, img, CV_BGR2YUV);
-	std::vector<cv::Mat> channels;
-	split(img, channels);
-	equalizeHist(channels[0], channels[0]);
-	merge(channels, img);
-	cvtColor(img, img, CV_YUV2BGR);
-	//cv::imshow("remove shadow", img);
+void splitImage(Mat frame, Mat& leftFrame, Mat& rightFrame) {
+	int img_size = frame.size().width;
+	leftFrame = frame(cv::Range(0, frame.size().height), cv::Range(0, (img_size / 2) - 1));
+	rightFrame = frame(cv::Range(0, frame.size().height), cv::Range((img_size / 2) + 1, img_size));
 }
+
 int main(int argc, char *argv[])
 {
 	enum METHOD {
@@ -1118,6 +1306,8 @@ int main(int argc, char *argv[])
 
 	std::string outputName_Left = outputName + "_Left";
 	std::string outputName_Right = outputName + "_Right";
+
+	std::string settingsPath = "C:\\Users\\Kestas\\Desktop\\Larnx Workspace\\setupCube.lrx";
 
 	switch (method)
 	{
@@ -1272,53 +1462,101 @@ int main(int argc, char *argv[])
 	}
 	case Get_Camera:
 	{
-		CvCapture* captureL = 0;
-		captureL = cvCreateCameraCapture(0);
-		if (!captureL) {
+		VideoCapture vcap(0);
+		if (!vcap.isOpened()) {
+			std::cout << "Error opening video stream or file" << std::endl;
 			return -1;
 		}
 
-		CvCapture* captureR = 0;
-		captureR = cvCreateCameraCapture(1);
-		if (!captureR) {
-			return -1;
+		std::string left_vid, right_vid;
+		std::string image_folder = outputPath;
+		std::cout << "Left video filename: ";
+		std::cin >> left_vid;
+		std::cout << "\n";
+		std::cout << "Right video filename: ";
+		std::cin >> right_vid;
+		std::cout << "\n";
+
+		int frame_width1 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
+		int frame_height1 = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
+		int frame_width2 = (vcap.get(CV_CAP_PROP_FRAME_WIDTH) / 2) - 1;
+		int frame_height2 = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
+		VideoWriter video1(left_vid, CV_FOURCC('M', 'J', 'P', 'G'), 10, Size(frame_width1, frame_height1), true);
+		VideoWriter video2(right_vid, CV_FOURCC('M', 'J', 'P', 'G'), 10, Size(frame_width2, frame_height2), true);
+
+
+		for (;;) {
+
+			Mat frame1, leftFrame, rightFrame;
+			vcap >> frame1;
+			splitImage(frame1, leftFrame, rightFrame);
+			imshow("Frame1", leftFrame);
+			imshow("Frame2", rightFrame);
+			video1.write(leftFrame);
+			video2.write(rightFrame);
+
+			char c = (char)waitKey(33);
+			if (c == 27) break;
 		}
+		VideoCapture cap1(left_vid);
+		VideoCapture cap2(right_vid);
+		int num_imgs = 0;
 
-		IplImage *frameL = cvQueryFrame(captureL);//Init the video read
-		IplImage *frameR = cvQueryFrame(captureR);//Init the video read
-		double fps = cvGetCaptureProperty(
-			captureL,
-			CV_CAP_PROP_FPS
-		);
+		readRectify(cap1, cap2, num_imgs, cap1.get(CV_CAP_PROP_FRAME_WIDTH), cap1.get(CV_CAP_PROP_FRAME_HEIGHT), image_folder, image_folder, "jpg", arbitraryParam);
 
-		CvSize size = cvSize(
-			(int)cvGetCaptureProperty(captureL, CV_CAP_PROP_FRAME_WIDTH),
-			(int)cvGetCaptureProperty(captureL, CV_CAP_PROP_FRAME_HEIGHT)
-		);
+		return 0;
 
-		CvVideoWriter *writerL = cvCreateVideoWriter(inputPath_Main.c_str(), CV_FOURCC('I', 'P', 'D', 'V'), fps, size); // AVI codec
-		CvVideoWriter *writerR = cvCreateVideoWriter(inputPath_Main.c_str(), CV_FOURCC('I', 'P', 'D', 'V'), fps, size);
-
-		while ((frameL = cvQueryFrame(captureL)) != NULL && (frameR = cvQueryFrame(captureR))) {
-			cvWriteFrame(writerL, frameL);
-			cvWriteFrame(writerR, frameR);
-
-			if (cvWaitKey(-1) == 27) {
-				cvReleaseVideoWriter(&writerL);
-				cvReleaseVideoWriter(&writerR);
-				cvReleaseCapture(&captureL);
-				cvReleaseCapture(&captureR);
-				break;
-			}
-
-		}
 	}
 	case 14:
 		outputName_Left = "\\" + outputName_Left;
 		outputName_Right = "\\" + outputName_Right;
-		volumeCalculation(inputPath_Left, inputPath_Right, outputPath, outputName_Left, inputPath_Confg, numDisparity, blockSize, minDisparity);
+		volumeCalculation(inputPath_Left, inputPath_Right, outputPath, outputName_Left, inputPath_Confg, numDisparity, blockSize, minDisparity, settingsPath);
 	default:
 		break;
 	}
 	return 0;
 }
+
+
+
+
+//CvCapture* captureL = 0;
+//captureL = cvCreateCameraCapture(0);
+//if (!captureL) {
+//	return -1;
+//}
+
+//CvCapture* captureR = 0;
+//captureR = cvCreateCameraCapture(1);
+//if (!captureR) {
+//	return -1;
+//}
+
+//IplImage *frameL = cvQueryFrame(captureL);//Init the video read
+//IplImage *frameR = cvQueryFrame(captureR);//Init the video read
+//double fps = cvGetCaptureProperty(
+//	captureL,
+//	CV_CAP_PROP_FPS
+//);
+
+//CvSize size = cvSize(
+//	(int)cvGetCaptureProperty(captureL, CV_CAP_PROP_FRAME_WIDTH),
+//	(int)cvGetCaptureProperty(captureL, CV_CAP_PROP_FRAME_HEIGHT)
+//);
+
+//CvVideoWriter *writerL = cvCreateVideoWriter(outputPath.c_str(), CV_FOURCC('I', 'P', 'D', 'V'), fps, size); 
+//CvVideoWriter *writerR = cvCreateVideoWriter(outputPath.c_str(), CV_FOURCC('I', 'P', 'D', 'V'), fps, size);
+
+//while ((frameL = cvQueryFrame(captureL)) != NULL && (frameR = cvQueryFrame(captureR))) {
+//	cvWriteFrame(writerL, frameL);
+//	cvWriteFrame(writerR, frameR);
+
+//	if (cvWaitKey(-1) == 27) {
+//		cvReleaseVideoWriter(&writerL);
+//		cvReleaseVideoWriter(&writerR);
+//		cvReleaseCapture(&captureL);
+//		cvReleaseCapture(&captureR);
+//		break;
+//	}
+
+//}
