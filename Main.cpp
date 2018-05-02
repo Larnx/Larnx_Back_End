@@ -72,7 +72,7 @@ void ThresholdHSV(std::string Video_Path, std::string Output_Directory_Path, std
 
 	std::ofstream outputFile;
 	outputFile.open(Output_Directory_Path + CSV_NAME);
-	outputFile << "Frame Count" << "," << "Time (sec)" << "," << "Pixel Intensity\n"; 	// write the file headers for csv
+	outputFile << "Frame Count" << "," << "Time (sec)" << "," << "Pixel Count\n"; 	// write the file headers for csv
 
 	Size frameSize(cap.get(CV_CAP_PROP_FRAME_WIDTH), cap.get(CV_CAP_PROP_FRAME_HEIGHT));		// frame width = 1280, height = 720
 	int fps = cap.get(CAP_PROP_FPS);															// 30 frames per second
@@ -95,15 +95,15 @@ void ThresholdHSV(std::string Video_Path, std::string Output_Directory_Path, std
 													//Scalar minHSV = Scalar(hsvPixel.val[0] - 40, hsvPixel.val[1] - 40, hsvPixel.val[2] - 40);
 													//Scalar maxHSV = Scalar(hsvPixel.val[0] + 40, hsvPixel.val[1] + 40, hsvPixel.val[2] + 40);
 		Scalar minHSV = Scalar(45, 1, 1);
-		Scalar maxHSV = Scalar(123, 254, 254);
+		Scalar maxHSV = Scalar(125, 254, 254);
 
-		Mat maskHSV, resultHSV(brightHSV.size(), CV_8UC3);
+		Mat maskHSV, resultHSV(bright.size(), CV_8UC3);
 		//inRange(brightHSV, Scalar(low_h, 1, 254), Scalar(high_h, 1, 254), maskHSV);
 		cv::inRange(brightHSV, minHSV, maxHSV, maskHSV);
 		cv::bitwise_and(brightHSV, brightHSV, resultHSV, maskHSV);
 
 		// get time stamps and sum pixels
-		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(resultHSV)[0] << std::endl;
+		outputFile << cap.get(CAP_PROP_POS_FRAMES) << "," << cap.get(CAP_PROP_POS_MSEC) / 1000 << "," << cv::sum(maskHSV)[0] << std::endl;
 		// print to console
 		//cout << cap.get(CAP_PROP_POS_MSEC) / 1000 << endl << cv::sum(resultHSV)[0] << endl;
 		//cout << "\{ \"x:\"\"" << cap.get(CAP_PROP_POS_MSEC) / 1000 << "\",\"y:\"" << cv::sum(resultHSV)[0] << "\"\}" << endl;
@@ -1362,6 +1362,7 @@ int main(int argc, char *argv[])
 	}
 	case Histogram_2D:
 	{
+		// NEED TO GET A FRAME WHERE THERE IS NO RESIDUE SO HAVE TO CALL SAVE FRAME FIRST - BUT FUNCTION WORKS
 		//histogramAnalysis(inputPath_Main, Frame_Path, Output_Directory_Path, File_Name);
 		break;
 	}
